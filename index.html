@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard Logístico · Última Milla</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+
+    <div class="sidebar-header">
+      <div class="logo-mark">
+        <span class="logo-icon">◈</span>
+      </div>
+      <div class="logo-text">
+        <p class="logo-label">Sistema Logístico</p>
+        <h1 class="logo-title">Última Milla</h1>
+        <p class="logo-sub">Acapulco · 2024</p>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card" id="kpi-unidades">
+        <span class="kpi-value" id="kpi-val-unidades">—</span>
+        <span class="kpi-label">Unidades en pantalla</span>
+        <div class="kpi-bar"><div class="kpi-fill" id="kpi-fill-unidades"></div></div>
+      </div>
+      <div class="kpi-card" id="kpi-ruta">
+        <span class="kpi-value" id="kpi-val-ruta">Todas</span>
+        <span class="kpi-label">Ruta seleccionada</span>
+      </div>
+      <div class="kpi-card" id="kpi-total">
+        <span class="kpi-value" id="kpi-val-total">—</span>
+        <span class="kpi-label">Total de rutas</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Filter -->
+    <div class="filter-section">
+      <label class="filter-label" for="route-select">
+        <span class="filter-icon">⊞</span> Filtrar por ruta
+      </label>
+      <div class="select-wrapper">
+        <select id="route-select">
+          <option value="all">Mostrar todas las rutas</option>
+        </select>
+        <span class="select-arrow">▾</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Route info panel -->
+    <div class="route-panel" id="route-panel">
+      <p class="route-panel-empty">Selecciona una ruta para ver el detalle del recorrido.</p>
+    </div>
+
+    <div class="sidebar-footer">
+      <span>GIS · Leaflet.js · OSM</span>
+    </div>
+
+  </aside>
+
+  <!-- ═══ MAIN MAP ═══ -->
+  <main class="main-content">
+    <div id="map"></div>
+    <div class="map-overlay-top">
+      <div class="map-badge" id="map-badge">
+        <span class="badge-dot all"></span>
+        <span id="badge-text">Cargando datos…</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

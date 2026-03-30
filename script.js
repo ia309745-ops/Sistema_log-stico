@@ -2,12 +2,10 @@
    script.js · Dashboard Logístico Última Milla
    ═══════════════════════════════════════════ */
 
-// ── RUTA DEL ARCHIVO ─────────────────────────────────────────────────────────
-// Coloca el GeoJSON en la misma carpeta que index.html.
-// Si usas Live Server en VS Code, la ruta relativa funciona directamente.
-const GEOJSON_PATH = 'rutas_optimizadas.geojson';
+const GEOJSON_PATH   = 'rutas_optimizadas.geojson';
+const POLYGONS_PATH  = 'polígonos.geojson';
 
-// ── PALETA DE COLORES POR RUTA ────────────────────────────────────────────────
+// ── PALETA ────────────────────────────────────────────────────────────────────
 const PALETTE = [
   '#00e5a0','#ff6b6b','#ffd93d','#6bceff','#c77dff',
   '#ff9f43','#48dbfb','#ff6348','#1dd1a1','#f368e0',
@@ -31,11 +29,15 @@ function getColor(nRuta) {
 }
 
 // ── ESTADO GLOBAL ─────────────────────────────────────────────────────────────
-let allFeatures   = [];
-let totalRoutes   = 0;
-let markerLayer   = null;
-let polylineLayer = null;
-let map           = null;
+let allFeatures    = [];
+let allPolygons    = [];
+let polygonByNRuta = {};   // { N_RUTA(int): feature }
+let totalRoutes    = 0;
+
+let markerLayer    = null;
+let polylineLayer  = null;
+let polygonLayer   = null;
+let map            = null;
 
 // ── INICIALIZAR MAPA ──────────────────────────────────────────────────────────
 function initMap() {
@@ -51,26 +53,43 @@ function initMap() {
     maxZoom: 19,
   }).addTo(map);
 
-  // Zoom control arriba-derecha
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 }
 
-// ── CARGAR GEOJSON ────────────────────────────────────────────────────────────
+// ── CARGAR AMBOS GEOJSON EN PARALELO ─────────────────────────────────────────
 async function loadGeoJSON() {
   setBadge('Cargando datos…', 'all', true);
 
   try {
-    const res = await fetch(GEOJSON_PATH);
-    if (!res.ok) throw new Error(`HTTP ${res.status}: No se pudo cargar ${GEOJSON_PATH}`);
-    const data = await res.json();
+    const [resRutas, resPoly] = await Promise.allSettled([
+      fetch(GEOJSON_PATH),
+      fetch(POLYGONS_PATH),
+    ]);
 
-    allFeatures = data.features.filter(f =>
+    // Puntos — obligatorio
+    if (resRutas.status === 'rejected' || !resRutas.value.ok)
+      throw new Error(`No se pudo cargar ${GEOJSON_PATH}`);
+
+    const dataRutas = await resRutas.value.json();
+    allFeatures = dataRutas.features.filter(f =>
       f.geometry && f.geometry.coordinates && f.properties
     );
+    if (allFeatures.length === 0)
+      throw new Error('El GeoJSON de rutas no contiene features válidas.');
 
-    if (allFeatures.length === 0) throw new Error('El GeoJSON no contiene features válidas.');
+    // Polígonos — opcional, no rompe el dashboard si falta
+    if (resPoly.status === 'fulfilled' && resPoly.value.ok) {
+      const dataPoly = await resPoly.value.json();
+      allPolygons = dataPoly.features.filter(f => f.geometry && f.properties);
+      allPolygons.forEach(f => {
+        polygonByNRuta[f.properties.N_RUTA] = f;
+      });
+      console.log(`Polígonos cargados: ${allPolygons.length}`);
+    } else {
+      console.warn('polígonos.geojson no encontrado — continuando sin polígonos.');
+    }
 
-    // Rutas únicas ordenadas
+    // Dropdown
     const rutasUnicas = [...new Set(allFeatures.map(f => f.properties.ID_RUTA))]
       .sort((a, b) => {
         const na = parseInt(a.replace(/\D/g, ''));
@@ -79,8 +98,6 @@ async function loadGeoJSON() {
       });
 
     totalRoutes = rutasUnicas.length;
-
-    // Llenar dropdown
     const sel = document.getElementById('route-select');
     rutasUnicas.forEach(ruta => {
       const opt = document.createElement('option');
@@ -90,11 +107,11 @@ async function loadGeoJSON() {
     });
 
     // KPIs iniciales
-    updateKPI('kpi-val-total', totalRoutes);
+    updateKPI('kpi-val-total',    totalRoutes);
     updateKPI('kpi-val-unidades', allFeatures.length);
+    updateKPI('kpi-val-area',     '—');
     document.getElementById('kpi-fill-unidades').style.width = '100%';
 
-    // Dibujar todo
     renderAll();
     setBadge(`${allFeatures.length} unidades · ${totalRoutes} rutas`, 'all', false);
 
@@ -116,7 +133,6 @@ function renderAll() {
   clearLayers();
 
   const markers = [];
-
   allFeatures.forEach(feat => {
     const [lng, lat] = feat.geometry.coordinates;
     const { ID_RUTA, N_RUTA, ORDEN_VISITA } = feat.properties;
@@ -129,23 +145,23 @@ function renderAll() {
       weight: 0.5,
       fillOpacity: 0.75,
     });
-
     marker.bindPopup(buildPopup(ID_RUTA, ORDEN_VISITA, color));
     markers.push(marker);
   });
 
   markerLayer = L.layerGroup(markers).addTo(map);
 
-  // Fit bounds
-  const coords = allFeatures.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
+  const coords = allFeatures.map(f => [
+    f.geometry.coordinates[1],
+    f.geometry.coordinates[0],
+  ]);
   if (coords.length) map.fitBounds(coords, { padding: [30, 30] });
 
-  // KPI
-  updateKPI('kpi-val-ruta', 'Todas');
+  updateKPI('kpi-val-ruta',     'Todas');
   updateKPI('kpi-val-unidades', allFeatures.length);
+  updateKPI('kpi-val-area',     '—');
   document.getElementById('kpi-fill-unidades').style.width = '100%';
 
-  // Panel
   document.getElementById('route-panel').innerHTML =
     `<p class="route-panel-empty">Selecciona una ruta para ver el detalle del recorrido.</p>`;
 }
@@ -157,26 +173,53 @@ function renderRoute(idRuta) {
   const features = allFeatures.filter(f => f.properties.ID_RUTA === idRuta);
   if (features.length === 0) return;
 
-  // Ordenar por ORDEN_VISITA
   const sorted = [...features].sort((a, b) =>
     a.properties.ORDEN_VISITA - b.properties.ORDEN_VISITA
   );
 
   const nRuta  = sorted[0].properties.N_RUTA;
   const color  = getColor(nRuta);
-  const coords = sorted.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
+  const coords = sorted.map(f => [
+    f.geometry.coordinates[1],
+    f.geometry.coordinates[0],
+  ]);
 
-  // Polyline de recorrido
+  // ── Polígono de zona (borde del color de la ruta, sin relleno) ────────────
+  const polyFeat = polygonByNRuta[nRuta] || null;
+  let areaHa = null;
+
+  if (polyFeat) {
+    areaHa = polyFeat.properties['Área Ha'];
+    const areaM2 = polyFeat.properties['Área m2'] || 0;
+
+    polygonLayer = L.geoJSON(polyFeat, {
+      style: {
+        color,
+        weight:      2.5,
+        opacity:     0.9,
+        fillOpacity: 0,
+        dashArray:   '8 5',
+      },
+    }).addTo(map);
+
+    polygonLayer.bindPopup(`
+      <div class="popup-inner">
+        <div class="popup-ruta" style="color:${color}">◈ ${idRuta} · Zona de cobertura</div>
+        <div class="popup-parada">Área: <span>${areaM2.toLocaleString('es-MX', { maximumFractionDigits: 0 })} m²</span></div>
+        <div class="popup-parada">Área: <span>${areaHa} Ha</span></div>
+      </div>`);
+  }
+
+  // ── Polyline de recorrido ─────────────────────────────────────────────────
   polylineLayer = L.polyline(coords, {
-    color: color,
-    weight: 2.5,
-    opacity: 0.7,
+    color,
+    weight:    2.5,
+    opacity:   0.7,
     dashArray: '6,4',
   }).addTo(map);
 
-  // Marcadores
+  // ── Marcadores ────────────────────────────────────────────────────────────
   const markers = [];
-
   sorted.forEach((feat, idx) => {
     const [lng, lat] = feat.geometry.coordinates;
     const { ID_RUTA, ORDEN_VISITA } = feat.properties;
@@ -192,13 +235,11 @@ function renderRoute(idRuta) {
     if (isLast)  { fillColor = '#ff4d6d'; radius = 8; borderColor = '#fff'; borderWeight = 2; }
 
     const marker = L.circleMarker([lat, lng], {
-      radius,
-      fillColor,
+      radius, fillColor,
       color: borderColor,
       weight: borderWeight,
       fillOpacity: 0.95,
     });
-
     marker.bindPopup(buildPopup(ID_RUTA, ORDEN_VISITA, fillColor));
     markers.push(marker);
   });
@@ -206,23 +247,32 @@ function renderRoute(idRuta) {
   markerLayer = L.layerGroup(markers).addTo(map);
   map.fitBounds(coords, { padding: [50, 50] });
 
-  // KPI
-  updateKPI('kpi-val-ruta', idRuta);
+  // ── KPIs ──────────────────────────────────────────────────────────────────
+  updateKPI('kpi-val-ruta',     idRuta);
   updateKPI('kpi-val-unidades', features.length);
+  updateKPI('kpi-val-area',     areaHa !== null ? `${areaHa} Ha` : 'N/D');
   const pct = Math.round((features.length / allFeatures.length) * 100);
   document.getElementById('kpi-fill-unidades').style.width = pct + '%';
 
   setBadge(`${idRuta} · ${features.length} paradas`, 'single', false);
-
-  // Panel lateral de detalle
-  renderRoutePanel(sorted, color);
+  renderRoutePanel(sorted, color, areaHa, polyFeat);
 }
 
-// ── PANEL DE DETALLE DE RUTA ──────────────────────────────────────────────────
-function renderRoutePanel(sorted, color) {
-  const panel = document.getElementById('route-panel');
-  const total = sorted.length;
+// ── PANEL DE DETALLE ──────────────────────────────────────────────────────────
+function renderRoutePanel(sorted, color, areaHa, polyFeat) {
+  const panel  = document.getElementById('route-panel');
+  const total  = sorted.length;
   const idRuta = sorted[0].properties.ID_RUTA;
+
+  const areaRow = polyFeat ? `
+    <div class="route-stat">
+      <span class="route-stat-label">Área Ha</span>
+      <span class="route-stat-value">${areaHa}</span>
+    </div>
+    <div class="route-stat">
+      <span class="route-stat-label">Área m²</span>
+      <span class="route-stat-value">${(polyFeat.properties['Área m2'] || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}</span>
+    </div>` : '';
 
   const stopsHTML = sorted.map((f, idx) => {
     const [lng, lat] = f.geometry.coordinates;
@@ -252,6 +302,7 @@ function renderRoutePanel(sorted, color) {
         <span class="route-stat-label">Fin</span>
         <span class="route-stat-value" style="color:#ff4d6d">● Parada #${total}</span>
       </div>
+      ${areaRow}
       <div class="route-stops">
         <span class="route-stops-label">Secuencia de visitas</span>
         <div class="stops-list">${stopsHTML}</div>
@@ -259,7 +310,7 @@ function renderRoutePanel(sorted, color) {
     </div>`;
 }
 
-// ── POPUP HTML ────────────────────────────────────────────────────────────────
+// ── POPUP ─────────────────────────────────────────────────────────────────────
 function buildPopup(idRuta, ordenVisita, color) {
   return `
     <div class="popup-inner">
@@ -268,10 +319,11 @@ function buildPopup(idRuta, ordenVisita, color) {
     </div>`;
 }
 
-// ── HELPERS ───────────────────────────────────────────────────────────────────
+// ── LIMPIAR CAPAS ─────────────────────────────────────────────────────────────
 function clearLayers() {
   if (markerLayer)   { map.removeLayer(markerLayer);   markerLayer   = null; }
   if (polylineLayer) { map.removeLayer(polylineLayer); polylineLayer = null; }
+  if (polygonLayer)  { map.removeLayer(polygonLayer);  polygonLayer  = null; }
 }
 
 function updateKPI(elId, value) {
@@ -280,15 +332,15 @@ function updateKPI(elId, value) {
 }
 
 function setBadge(text, dotClass, loading) {
-  const badge   = document.getElementById('map-badge');
-  const dot     = badge.querySelector('.badge-dot');
-  const textEl  = document.getElementById('badge-text');
-  dot.className = `badge-dot ${dotClass}`;
+  const badge  = document.getElementById('map-badge');
+  const dot    = badge.querySelector('.badge-dot');
+  const textEl = document.getElementById('badge-text');
+  dot.className      = `badge-dot ${dotClass}`;
   textEl.textContent = text;
   badge.classList.toggle('loading', loading);
 }
 
-// ── EVENT: DROPDOWN ───────────────────────────────────────────────────────────
+// ── DROPDOWN ──────────────────────────────────────────────────────────────────
 document.getElementById('route-select').addEventListener('change', function () {
   const val = this.value;
   if (val === 'all') {

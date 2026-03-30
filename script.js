@@ -354,3 +354,24 @@ document.getElementById('route-select').addEventListener('change', function () {
 // ── ARRANQUE ──────────────────────────────────────────────────────────────────
 initMap();
 loadGeoJSON();
+
+// ── MODAL METODOLOGÍA ─────────────────────────────────────────────────────────
+const backdrop  = document.getElementById('modal-backdrop');
+const openBtn   = document.getElementById('open-method');
+const closeBtn  = document.getElementById('close-modal');
+
+function openModal()  { backdrop.classList.add('open');    document.body.style.overflow = 'hidden'; }
+function closeModal() { backdrop.classList.remove('open'); document.body.style.overflow = ''; }
+
+openBtn.addEventListener('click', openModal);
+closeBtn.addEventListener('click', closeModal);
+
+// Cerrar al hacer clic fuera del modal
+backdrop.addEventListener('click', function(e) {
+  if (e.target === backdrop) closeModal();
+});
+
+// Cerrar con Escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeModal();
+});

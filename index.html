@@ -76,10 +76,97 @@
     </div>
 
     <div class="sidebar-footer">
-      <span>GIS · Leaflet.js · OSM</span>
+      <button class="method-btn" id="open-method">
+        <span class="method-btn-icon">◎</span> Metodología &amp; Contacto
+      </button>
+      <div class="footer-credits">GIS · Leaflet.js · OSM</div>
     </div>
 
   </aside>
+
+  <!-- ═══ MODAL METODOLOGÍA ═══ -->
+  <div class="modal-backdrop" id="modal-backdrop">
+    <div class="modal" id="modal">
+
+      <div class="modal-header">
+        <div class="modal-title-block">
+          <span class="modal-icon">◎</span>
+          <div>
+            <h2 class="modal-title">Metodología de Optimización Espacial</h2>
+            <p class="modal-subtitle">Logística Urbana de Última Milla · Acapulco 2025</p>
+          </div>
+        </div>
+        <button class="modal-close" id="close-modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+
+        <div class="phase-card">
+          <div class="phase-header">
+            <span class="phase-num">01</span>
+            <div>
+              <span class="phase-tag">Identificación de la Demanda</span>
+              <h3 class="phase-title">Análisis de Densidad de Kernel (KDE)</h3>
+            </div>
+          </div>
+          <p class="phase-desc">Transformar el inventario de unidades económicas (DENUE) en una superficie continua para localizar los focos térmicos de mayor demanda comercial, estableciendo las "semillas" iniciales de distribución.</p>
+        </div>
+
+        <div class="phase-card">
+          <div class="phase-header">
+            <span class="phase-num">02</span>
+            <div>
+              <span class="phase-tag">Macrolocalización y Agrupamiento</span>
+              <h3 class="phase-title">Clustering K-Means con Tolerancia de Capacidad</h3>
+            </div>
+          </div>
+          <p class="phase-desc">Segmentar la mancha urbana en "Territorios de Reparto" equilibrados (objetivo de 50 unidades, con holgura de expansión), asignando tiendas a su centroide más cercano mediante distancia euclidiana para evitar sesgos por errores en la red vial oficial.</p>
+        </div>
+
+        <div class="phase-card">
+          <div class="phase-header">
+            <span class="phase-num">03</span>
+            <div>
+              <span class="phase-tag">Validación Topológica · Intervención Humana</span>
+              <h3 class="phase-title">Depuración Espacial y Control de Calidad Geométrica</h3>
+            </div>
+          </div>
+          <p class="phase-desc">Inspeccionar visualmente los clústeres generados y reasignar manualmente las unidades económicas dispersas o afectadas por el "Efecto Frontera" hacia los polígonos más coherentes con la morfología urbana real y la conectividad de las colonias.</p>
+        </div>
+
+        <div class="phase-card">
+          <div class="phase-header">
+            <span class="phase-num">04</span>
+            <div>
+              <span class="phase-tag">Microlocalización y Secuenciación</span>
+              <h3 class="phase-title">TSP — Algoritmo del Vecino Más Cercano</h3>
+            </div>
+          </div>
+          <p class="phase-desc">Calcular el orden exacto de visita (<code>ORDEN_VISITA</code>) dentro de cada territorio ajustado, midiendo la distancia real sobre un grafo de calles proyectado a un sistema métrico estandarizado (tolerancia de 20 m para soldar cruceros rotos).</p>
+        </div>
+
+        <div class="phase-card">
+          <div class="phase-header">
+            <span class="phase-num">05</span>
+            <div>
+              <span class="phase-tag">Geovisualización y Ruteo Físico</span>
+              <h3 class="phase-title">Envolventes Convexas y Pathfinding de Trazos</h3>
+            </div>
+          </div>
+          <p class="phase-desc">Generar los polígonos definitivos que delimitan el área de cobertura de cada ruta y extraer las geometrías de las calles utilizadas (MultiLineStrings) para proyectar el recorrido físico del vehículo sobre el mapa.</p>
+        </div>
+
+        <div class="contact-block">
+          <span class="contact-icon">◈</span>
+          <div class="contact-info">
+            <p class="contact-name">Urb. Ismael Luna</p>
+            <a class="contact-email" href="mailto:ia309745@gmail.com">ia309745@gmail.com</a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
 
   <!-- ═══ MAIN MAP ═══ -->
   <main class="main-content">

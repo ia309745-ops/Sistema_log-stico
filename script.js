@@ -2,8 +2,8 @@
    script.js · Dashboard Logístico Última Milla
    ═══════════════════════════════════════════ */
 
-const GEOJSON_PATH   = 'rutas_optimizadas.geojson';
-const POLYGONS_PATH  = 'polígonos.geojson';
+const GEOJSON_PATH  = 'rutas_optimizadas.geojson';
+const POLYGONS_PATH = 'polígonos.geojson';
 
 // ── PALETA ────────────────────────────────────────────────────────────────────
 const PALETTE = [
@@ -24,222 +24,160 @@ const PALETTE = [
   '#fa709a','#fee140','#30cfd0','#667eea','#764ba2',
 ];
 
-function getColor(nRuta) {
-  return PALETTE[(nRuta - 1) % PALETTE.length];
-}
+function getColor(nRuta) { return PALETTE[(nRuta - 1) % PALETTE.length]; }
 
 // ── ESTADO GLOBAL ─────────────────────────────────────────────────────────────
 let allFeatures    = [];
 let allPolygons    = [];
-let polygonByNRuta = {};   // { N_RUTA(int): feature }
+let polygonByNRuta = {};
 let totalRoutes    = 0;
-
 let markerLayer    = null;
 let polylineLayer  = null;
 let polygonLayer   = null;
 let map            = null;
+let currentRouteId = null;   // ruta activa para descarga
 
-// ── INICIALIZAR MAPA ──────────────────────────────────────────────────────────
+// ── CAMPOS A EXPORTAR ─────────────────────────────────────────────────────────
+// Ajusta estos nombres exactos a los que tenga tu GeoJSON
+const EXPORT_FIELDS = [
+  { key: 'ORDEN_VISITA', label: 'Orden de visita' },
+  { key: 'nom_estab',    label: 'Nombre / Razón social' },
+  { key: 'municipio',    label: 'Municipio' },
+  { key: 'telefono',     label: 'Teléfono' },
+];
+// Coordenadas se agregan siempre desde la geometría
+
+// ── MAPA ──────────────────────────────────────────────────────────────────────
 function initMap() {
-  map = L.map('map', {
-    center: [16.86, -99.88],
-    zoom: 12,
-    zoomControl: false,
-  });
-
+  map = L.map('map', { center: [16.86, -99.88], zoom: 12, zoomControl: false });
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; OpenStreetMap &copy; CARTO',
-    subdomains: 'abcd',
-    maxZoom: 19,
+    subdomains: 'abcd', maxZoom: 19,
   }).addTo(map);
-
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 }
 
-// ── CARGAR AMBOS GEOJSON EN PARALELO ─────────────────────────────────────────
+// ── CARGA DE DATOS ────────────────────────────────────────────────────────────
 async function loadGeoJSON() {
   setBadge('Cargando datos…', 'all', true);
-
   try {
     const [resRutas, resPoly] = await Promise.allSettled([
       fetch(GEOJSON_PATH),
       fetch(POLYGONS_PATH),
     ]);
 
-    // Puntos — obligatorio
     if (resRutas.status === 'rejected' || !resRutas.value.ok)
-      throw new Error(`No se pudo cargar ${GEOJSON_PATH}`);
+      throw new Error('No se pudo cargar ' + GEOJSON_PATH);
 
     const dataRutas = await resRutas.value.json();
-    allFeatures = dataRutas.features.filter(f =>
-      f.geometry && f.geometry.coordinates && f.properties
-    );
-    if (allFeatures.length === 0)
-      throw new Error('El GeoJSON de rutas no contiene features válidas.');
+    allFeatures = dataRutas.features.filter(f => f.geometry && f.geometry.coordinates && f.properties);
+    if (allFeatures.length === 0) throw new Error('El GeoJSON no contiene features válidas.');
 
-    // Polígonos — opcional, no rompe el dashboard si falta
     if (resPoly.status === 'fulfilled' && resPoly.value.ok) {
       const dataPoly = await resPoly.value.json();
       allPolygons = dataPoly.features.filter(f => f.geometry && f.properties);
-      allPolygons.forEach(f => {
-        polygonByNRuta[f.properties.N_RUTA] = f;
-      });
-      console.log(`Polígonos cargados: ${allPolygons.length}`);
-    } else {
-      console.warn('polígonos.geojson no encontrado — continuando sin polígonos.');
+      allPolygons.forEach(f => { polygonByNRuta[f.properties.N_RUTA] = f; });
     }
 
-    // Dropdown
     const rutasUnicas = [...new Set(allFeatures.map(f => f.properties.ID_RUTA))]
-      .sort((a, b) => {
-        const na = parseInt(a.replace(/\D/g, ''));
-        const nb = parseInt(b.replace(/\D/g, ''));
-        return na - nb;
-      });
+      .sort((a, b) => parseInt(a.replace(/\D/g,'')) - parseInt(b.replace(/\D/g,'')));
 
     totalRoutes = rutasUnicas.length;
     const sel = document.getElementById('route-select');
     rutasUnicas.forEach(ruta => {
       const opt = document.createElement('option');
-      opt.value = ruta;
-      opt.textContent = ruta;
+      opt.value = ruta; opt.textContent = ruta;
       sel.appendChild(opt);
     });
 
-    // KPIs iniciales
     updateKPI('kpi-val-total',    totalRoutes);
     updateKPI('kpi-val-unidades', allFeatures.length);
     updateKPI('kpi-val-area',     '—');
     document.getElementById('kpi-fill-unidades').style.width = '100%';
 
     renderAll();
-    setBadge(`${allFeatures.length} unidades · ${totalRoutes} rutas`, 'all', false);
+    setBadge(allFeatures.length + ' unidades · ' + totalRoutes + ' rutas', 'all', false);
 
   } catch (err) {
     console.error(err);
-    setBadge(`Error: ${err.message}`, 'all', false);
+    setBadge('Error: ' + err.message, 'all', false);
     document.getElementById('route-panel').innerHTML =
-      `<p style="color:var(--danger);font-size:12px;line-height:1.7;">
-        ⚠ No se pudo cargar el archivo GeoJSON.<br>
-        Asegúrate de que <code>rutas_optimizadas.geojson</code> esté en la misma
-        carpeta que <code>index.html</code> y de usar un servidor local
-        (Live Server, http-server, etc.).
-      </p>`;
+      '<p style="color:var(--danger);font-size:12px;line-height:1.7;">&#9888; No se pudo cargar el GeoJSON.<br>Usa Live Server y verifica que los archivos estén en la misma carpeta.</p>';
   }
 }
 
-// ── RENDERIZAR TODOS LOS PUNTOS ───────────────────────────────────────────────
+// ── RENDER TODOS ──────────────────────────────────────────────────────────────
 function renderAll() {
   clearLayers();
+  currentRouteId = null;
 
   const markers = [];
   allFeatures.forEach(feat => {
     const [lng, lat] = feat.geometry.coordinates;
     const { ID_RUTA, N_RUTA, ORDEN_VISITA } = feat.properties;
     const color = getColor(N_RUTA);
-
     const marker = L.circleMarker([lat, lng], {
-      radius: 4,
-      fillColor: color,
-      color: 'rgba(0,0,0,0.3)',
-      weight: 0.5,
-      fillOpacity: 0.75,
+      radius: 4, fillColor: color,
+      color: 'rgba(0,0,0,0.3)', weight: 0.5, fillOpacity: 0.75,
     });
     marker.bindPopup(buildPopup(ID_RUTA, ORDEN_VISITA, color));
     markers.push(marker);
   });
 
   markerLayer = L.layerGroup(markers).addTo(map);
-
-  const coords = allFeatures.map(f => [
-    f.geometry.coordinates[1],
-    f.geometry.coordinates[0],
-  ]);
+  const coords = allFeatures.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
   if (coords.length) map.fitBounds(coords, { padding: [30, 30] });
 
   updateKPI('kpi-val-ruta',     'Todas');
   updateKPI('kpi-val-unidades', allFeatures.length);
   updateKPI('kpi-val-area',     '—');
   document.getElementById('kpi-fill-unidades').style.width = '100%';
-
   document.getElementById('route-panel').innerHTML =
-    `<p class="route-panel-empty">Selecciona una ruta para ver el detalle del recorrido.</p>`;
+    '<p class="route-panel-empty">Selecciona una ruta para ver el detalle del recorrido.</p>';
 }
 
-// ── RENDERIZAR RUTA ESPECÍFICA ────────────────────────────────────────────────
+// ── RENDER RUTA ───────────────────────────────────────────────────────────────
 function renderRoute(idRuta) {
   clearLayers();
+  currentRouteId = idRuta;
 
   const features = allFeatures.filter(f => f.properties.ID_RUTA === idRuta);
   if (features.length === 0) return;
 
-  const sorted = [...features].sort((a, b) =>
-    a.properties.ORDEN_VISITA - b.properties.ORDEN_VISITA
-  );
-
+  const sorted = [...features].sort((a, b) => a.properties.ORDEN_VISITA - b.properties.ORDEN_VISITA);
   const nRuta  = sorted[0].properties.N_RUTA;
   const color  = getColor(nRuta);
-  const coords = sorted.map(f => [
-    f.geometry.coordinates[1],
-    f.geometry.coordinates[0],
-  ]);
+  const coords = sorted.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
 
-  // ── Polígono de zona (borde del color de la ruta, sin relleno) ────────────
+  // Polígono
   const polyFeat = polygonByNRuta[nRuta] || null;
   let areaHa = null;
-
   if (polyFeat) {
-    areaHa = polyFeat.properties['Área Ha'];
-    const areaM2 = polyFeat.properties['Área m2'] || 0;
-
+    areaHa = polyFeat.properties['Area Ha'] || polyFeat.properties['Área Ha'] || null;
+    const areaM2 = polyFeat.properties['Area m2'] || polyFeat.properties['Área m2'] || 0;
     polygonLayer = L.geoJSON(polyFeat, {
-      style: {
-        color,
-        weight:      2.5,
-        opacity:     0.9,
-        fillOpacity: 0,
-        dashArray:   '8 5',
-      },
+      style: { color: 'rgba(255,255,255,0.55)', weight: 1.5, fillOpacity: 0, dashArray: '6 4' },
     }).addTo(map);
-
-    polygonLayer.bindPopup(`
-      <div class="popup-inner">
-        <div class="popup-ruta" style="color:${color}">◈ ${idRuta} · Zona de cobertura</div>
-        <div class="popup-parada">Área: <span>${areaM2.toLocaleString('es-MX', { maximumFractionDigits: 0 })} m²</span></div>
-        <div class="popup-parada">Área: <span>${areaHa} Ha</span></div>
-      </div>`);
+    polygonLayer.bindPopup(
+      '<div class="popup-inner"><div class="popup-ruta" style="color:' + color + '">&#9672; ' + idRuta + ' · Zona</div>' +
+      '<div class="popup-parada">Área: <span>' + Number(areaM2).toLocaleString('es-MX', {maximumFractionDigits:0}) + ' m²</span></div>' +
+      '<div class="popup-parada">Área: <span>' + areaHa + ' Ha</span></div></div>'
+    );
   }
 
-  // ── Polyline de recorrido ─────────────────────────────────────────────────
-  polylineLayer = L.polyline(coords, {
-    color,
-    weight:    2.5,
-    opacity:   0.7,
-    dashArray: '6,4',
-  }).addTo(map);
+  // Polyline
+  polylineLayer = L.polyline(coords, { color, weight: 2.5, opacity: 0.7, dashArray: '6,4' }).addTo(map);
 
-  // ── Marcadores ────────────────────────────────────────────────────────────
+  // Marcadores
   const markers = [];
   sorted.forEach((feat, idx) => {
     const [lng, lat] = feat.geometry.coordinates;
     const { ID_RUTA, ORDEN_VISITA } = feat.properties;
-    const isFirst = idx === 0;
-    const isLast  = idx === sorted.length - 1;
-
-    let radius      = 5;
-    let fillColor   = color;
-    let borderColor = 'rgba(0,0,0,0.4)';
-    let borderWeight = 1;
-
+    const isFirst = idx === 0, isLast = idx === sorted.length - 1;
+    let radius = 5, fillColor = color, borderColor = 'rgba(0,0,0,0.4)', borderWeight = 1;
     if (isFirst) { fillColor = '#ffb703'; radius = 8; borderColor = '#fff'; borderWeight = 2; }
     if (isLast)  { fillColor = '#ff4d6d'; radius = 8; borderColor = '#fff'; borderWeight = 2; }
-
-    const marker = L.circleMarker([lat, lng], {
-      radius, fillColor,
-      color: borderColor,
-      weight: borderWeight,
-      fillOpacity: 0.95,
-    });
+    const marker = L.circleMarker([lat, lng], { radius, fillColor, color: borderColor, weight: borderWeight, fillOpacity: 0.95 });
     marker.bindPopup(buildPopup(ID_RUTA, ORDEN_VISITA, fillColor));
     markers.push(marker);
   });
@@ -247,18 +185,17 @@ function renderRoute(idRuta) {
   markerLayer = L.layerGroup(markers).addTo(map);
   map.fitBounds(coords, { padding: [50, 50] });
 
-  // ── KPIs ──────────────────────────────────────────────────────────────────
   updateKPI('kpi-val-ruta',     idRuta);
   updateKPI('kpi-val-unidades', features.length);
-  updateKPI('kpi-val-area',     areaHa !== null ? `${areaHa} Ha` : 'N/D');
+  updateKPI('kpi-val-area',     areaHa !== null ? areaHa + ' Ha' : 'N/D');
   const pct = Math.round((features.length / allFeatures.length) * 100);
   document.getElementById('kpi-fill-unidades').style.width = pct + '%';
 
-  setBadge(`${idRuta} · ${features.length} paradas`, 'single', false);
+  setBadge(idRuta + ' · ' + features.length + ' paradas', 'single', false);
   renderRoutePanel(sorted, color, areaHa, polyFeat);
 }
 
-// ── PANEL DE DETALLE ──────────────────────────────────────────────────────────
+// ── PANEL LATERAL ─────────────────────────────────────────────────────────────
 function renderRoutePanel(sorted, color, areaHa, polyFeat) {
   const panel  = document.getElementById('route-panel');
   const total  = sorted.length;
@@ -267,59 +204,170 @@ function renderRoutePanel(sorted, color, areaHa, polyFeat) {
   const areaRow = polyFeat ? `
     <div class="route-stat">
       <span class="route-stat-label">Área Ha</span>
-      <span class="route-stat-value">${areaHa}</span>
+      <span class="route-stat-value">${areaHa || 'N/D'}</span>
     </div>
     <div class="route-stat">
       <span class="route-stat-label">Área m²</span>
-      <span class="route-stat-value">${(polyFeat.properties['Área m2'] || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}</span>
+      <span class="route-stat-value">${Number(polyFeat.properties['Area m2'] || polyFeat.properties['Área m2'] || 0).toLocaleString('es-MX',{maximumFractionDigits:0})}</span>
     </div>` : '';
 
   const stopsHTML = sorted.map((f, idx) => {
     const [lng, lat] = f.geometry.coordinates;
-    const isFirst = idx === 0;
-    const isLast  = idx === total - 1;
-    const dotClass = isFirst ? 'first' : isLast ? 'last' : '';
-    return `
-      <div class="stop-item">
-        <span class="stop-num">#${f.properties.ORDEN_VISITA}</span>
-        <span class="stop-dot ${dotClass}"></span>
-        <span class="stop-coords">${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
-      </div>`;
+    const dotClass = idx === 0 ? 'first' : idx === total - 1 ? 'last' : '';
+    return `<div class="stop-item">
+      <span class="stop-num">#${f.properties.ORDEN_VISITA}</span>
+      <span class="stop-dot ${dotClass}"></span>
+      <span class="stop-coords">${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
+    </div>`;
   }).join('');
 
   panel.innerHTML = `
     <div class="route-detail">
-      <div class="route-detail-title" style="color:${color}">◈ ${idRuta}</div>
+      <div class="route-detail-title" style="color:${color}">&#9672; ${idRuta}</div>
       <div class="route-stat">
         <span class="route-stat-label">Total paradas</span>
         <span class="route-stat-value">${total}</span>
       </div>
       <div class="route-stat">
         <span class="route-stat-label">Inicio</span>
-        <span class="route-stat-value" style="color:#ffb703">● Parada #1</span>
+        <span class="route-stat-value" style="color:#ffb703">&#9679; Parada #1</span>
       </div>
       <div class="route-stat">
         <span class="route-stat-label">Fin</span>
-        <span class="route-stat-value" style="color:#ff4d6d">● Parada #${total}</span>
+        <span class="route-stat-value" style="color:#ff4d6d">&#9679; Parada #${total}</span>
       </div>
       ${areaRow}
       <div class="route-stops">
         <span class="route-stops-label">Secuencia de visitas</span>
         <div class="stops-list">${stopsHTML}</div>
       </div>
+    </div>
+    <div class="download-bar">
+      <button class="dl-btn dl-btn-pdf" id="btn-dl-pdf">&#8681; Descargar PDF</button>
+      <button class="dl-btn dl-btn-excel" id="btn-dl-excel">&#8681; Descargar Excel / CSV</button>
     </div>`;
+
+  document.getElementById('btn-dl-pdf').addEventListener('click',   () => downloadPDF(sorted, idRuta, color));
+  document.getElementById('btn-dl-excel').addEventListener('click', () => downloadExcel(sorted, idRuta));
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function buildRouteRows(sorted) {
+  return sorted.map(f => {
+    const [lng, lat] = f.geometry.coordinates;
+    const p = f.properties;
+    return {
+      orden:   p.ORDEN_VISITA || '',
+      nombre:  p.nom_estab   || p.nombre || p.NOMBRE || p.razon_social || '—',
+      municipio: p.municipio || p.MUNICIPIO || '—',
+      telefono: p.telefono   || p.TELEFONO || '—',
+      lat:     lat.toFixed(6),
+      lng:     lng.toFixed(6),
+    };
+  });
+}
+
+// ── DESCARGA PDF ──────────────────────────────────────────────────────────────
+function downloadPDF(sorted, idRuta, color) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210, margin = 14;
+
+  // ─ Encabezado ─
+  doc.setFillColor(13, 15, 20);
+  doc.rect(0, 0, W, 36, 'F');
+
+  // Franja de color de la ruta
+  const hex = color.replace('#','');
+  const r = parseInt(hex.substring(0,2),16);
+  const g = parseInt(hex.substring(2,4),16);
+  const b = parseInt(hex.substring(4,6),16);
+  doc.setFillColor(r, g, b);
+  doc.rect(0, 0, 4, 36, 'F');
+
+  doc.setTextColor(232, 234, 240);
+  doc.setFontSize(16);
+  doc.setFont('helvetica','bold');
+  doc.text('Dashboard Logístico · Última Milla', margin + 4, 13);
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica','normal');
+  doc.setTextColor(r, g, b);
+  doc.text(idRuta + '  ·  ' + sorted.length + ' paradas  ·  Acapulco 2025', margin + 4, 22);
+
+  doc.setTextColor(120, 128, 153);
+  doc.text('Generado: ' + new Date().toLocaleString('es-MX'), margin + 4, 30);
+
+  // ─ Tabla ─
+  const rows = buildRouteRows(sorted);
+  doc.autoTable({
+    startY: 42,
+    head: [['#', 'Nombre / Razón social', 'Municipio', 'Teléfono', 'Latitud', 'Longitud']],
+    body: rows.map(r => [r.orden, r.nombre, r.municipio, r.telefono, r.lat, r.lng]),
+    styles: {
+      fontSize: 8,
+      cellPadding: 2.5,
+      overflow: 'linebreak',
+      textColor: [50, 55, 70],
+    },
+    headStyles: {
+      fillColor: [13, 15, 20],
+      textColor: [0, 229, 160],
+      fontStyle: 'bold',
+      fontSize: 8,
+    },
+    alternateRowStyles: { fillColor: [245, 246, 250] },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' },
+      1: { cellWidth: 60 },
+      2: { cellWidth: 28 },
+      3: { cellWidth: 25 },
+      4: { cellWidth: 28, halign: 'right' },
+      5: { cellWidth: 28, halign: 'right' },
+    },
+    margin: { left: margin, right: margin },
+    didDrawPage: (data) => {
+      // Pie de página
+      doc.setFontSize(7);
+      doc.setTextColor(150);
+      doc.text(
+        'Urb. Ismael Luna · ia309745@gmail.com  |  Pág. ' + data.pageNumber,
+        margin, 290
+      );
+    }
+  });
+
+  doc.save(idRuta + '_ruta.pdf');
+}
+
+// ── DESCARGA EXCEL ────────────────────────────────────────────────────────────
+function downloadExcel(sorted, idRuta) {
+  const rows = buildRouteRows(sorted);
+
+  const wsData = [
+    ['Orden de visita', 'Nombre / Razón social', 'Municipio', 'Teléfono', 'Latitud', 'Longitud'],
+    ...rows.map(r => [r.orden, r.nombre, r.municipio, r.telefono, r.lat, r.lng])
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Anchos de columna
+  ws['!cols'] = [
+    { wch: 8 }, { wch: 40 }, { wch: 20 }, { wch: 16 }, { wch: 14 }, { wch: 14 }
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, idRuta);
+  XLSX.writeFile(wb, idRuta + '_ruta.xlsx');
 }
 
 // ── POPUP ─────────────────────────────────────────────────────────────────────
 function buildPopup(idRuta, ordenVisita, color) {
-  return `
-    <div class="popup-inner">
-      <div class="popup-ruta" style="color:${color}">◈ ${idRuta}</div>
-      <div class="popup-parada">Parada #: <span>${ordenVisita}</span></div>
-    </div>`;
+  return '<div class="popup-inner">' +
+    '<div class="popup-ruta" style="color:' + color + '">&#9672; ' + idRuta + '</div>' +
+    '<div class="popup-parada">Parada #: <span>' + ordenVisita + '</span></div></div>';
 }
 
-// ── LIMPIAR CAPAS ─────────────────────────────────────────────────────────────
 function clearLayers() {
   if (markerLayer)   { map.removeLayer(markerLayer);   markerLayer   = null; }
   if (polylineLayer) { map.removeLayer(polylineLayer); polylineLayer = null; }
@@ -335,43 +383,144 @@ function setBadge(text, dotClass, loading) {
   const badge  = document.getElementById('map-badge');
   const dot    = badge.querySelector('.badge-dot');
   const textEl = document.getElementById('badge-text');
-  dot.className      = `badge-dot ${dotClass}`;
+  dot.className      = 'badge-dot ' + dotClass;
   textEl.textContent = text;
   badge.classList.toggle('loading', loading);
 }
 
 // ── DROPDOWN ──────────────────────────────────────────────────────────────────
-document.getElementById('route-select').addEventListener('change', function () {
+document.getElementById('route-select').addEventListener('change', function() {
   const val = this.value;
   if (val === 'all') {
     renderAll();
-    setBadge(`${allFeatures.length} unidades · ${totalRoutes} rutas`, 'all', false);
+    setBadge(allFeatures.length + ' unidades · ' + totalRoutes + ' rutas', 'all', false);
   } else {
     renderRoute(val);
   }
 });
 
-// ── ARRANQUE ──────────────────────────────────────────────────────────────────
-initMap();
-loadGeoJSON();
-
-// ── MODAL METODOLOGÍA ─────────────────────────────────────────────────────────
+// ── MODALES ───────────────────────────────────────────────────────────────────
 const backdrop  = document.getElementById('modal-backdrop');
 const openBtn   = document.getElementById('open-method');
 const closeBtn  = document.getElementById('close-modal');
-
 function openModal()  { backdrop.classList.add('open');    document.body.style.overflow = 'hidden'; }
 function closeModal() { backdrop.classList.remove('open'); document.body.style.overflow = ''; }
-
 openBtn.addEventListener('click', openModal);
 closeBtn.addEventListener('click', closeModal);
+backdrop.addEventListener('click', e => { if (e.target === backdrop) closeModal(); });
 
-// Cerrar al hacer clic fuera del modal
-backdrop.addEventListener('click', function(e) {
-  if (e.target === backdrop) closeModal();
-});
+const calcBackdrop = document.getElementById('calc-backdrop');
+const openCalcBtn  = document.getElementById('open-calc');
+const closeCalcBtn = document.getElementById('close-calc');
+function openCalc()  { calcBackdrop.classList.add('open');    document.body.style.overflow = 'hidden'; }
+function closeCalc() { calcBackdrop.classList.remove('open'); document.body.style.overflow = ''; }
+openCalcBtn.addEventListener('click',  openCalc);
+closeCalcBtn.addEventListener('click', closeCalc);
+calcBackdrop.addEventListener('click', e => { if (e.target === calcBackdrop) closeCalc(); });
 
-// Cerrar con Escape
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closeModal();
-});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeCalc(); } });
+
+// ── CALCULADORA ───────────────────────────────────────────────────────────────
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function calcDistanciaRuta(features) {
+  const sorted = [...features].sort((a,b) => a.properties.ORDEN_VISITA - b.properties.ORDEN_VISITA);
+  let dist = 0;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const [lng1,lat1] = sorted[i].geometry.coordinates;
+    const [lng2,lat2] = sorted[i+1].geometry.coordinates;
+    dist += haversine(lat1,lng1,lat2,lng2);
+  }
+  return dist * 1.35;
+}
+
+function getSemaforo(paradas, distKm, areaHa) {
+  const d = areaHa > 0 ? paradas / areaHa : 0;
+  if (d < 0.05 && distKm > 20) return { clase: 'alert', txt: '&#9888; Revisar' };
+  if (d > 2    && distKm < 8)  return { clase: 'moto',  txt: '&#8853; Moto/Bici' };
+  if (paradas < 25)            return { clase: 'warn',  txt: '&#9680; Carga baja' };
+  return { clase: 'ok', txt: '&#10003; Óptima' };
+}
+
+function formatTime(h) {
+  const hh = Math.floor(h), mm = Math.round((h-hh)*60);
+  return hh > 0 ? hh+'h '+mm+'min' : mm+' min';
+}
+
+function runCalc() {
+  if (allFeatures.length === 0) return;
+  const precio         = parseFloat(document.getElementById('c-precio').value)         || 23.5;
+  const rendimiento    = parseFloat(document.getElementById('c-rendimiento').value)    || 10;
+  const velocidad      = parseFloat(document.getElementById('c-velocidad').value)      || 25;
+  const tEntrega       = parseFloat(document.getElementById('c-tiempo-entrega').value) || 8;
+  const costoAdicional = parseFloat(document.getElementById('c-adicional').value)      || 0;
+
+  const rutasMap = {};
+  allFeatures.forEach(f => {
+    const id = f.properties.ID_RUTA;
+    if (!rutasMap[id]) rutasMap[id] = [];
+    rutasMap[id].push(f);
+  });
+
+  const rutas = Object.keys(rutasMap).sort((a,b) => parseInt(a.replace(/\D/g,'')) - parseInt(b.replace(/\D/g,'')));
+  let totalDist=0, totalCosto=0, totalTiempo=0, totalParadas=0, totalAreaHa=0, rutasConArea=0;
+
+  const tbody = document.getElementById('calc-tbody');
+  tbody.innerHTML = '';
+
+  rutas.forEach(idRuta => {
+    const features = rutasMap[idRuta];
+    const nRuta    = features[0].properties.N_RUTA;
+    const paradas  = features.length;
+    const distKm   = calcDistanciaRuta(features);
+    const litros   = distKm / rendimiento;
+    const costoTotal = litros * precio + costoAdicional;
+    const tViajeH  = distKm / velocidad;
+    const tEntregaH= (paradas * tEntrega) / 60;
+    const tTotalH  = tViajeH + tEntregaH;
+    const pf       = polygonByNRuta[nRuta] || null;
+    const areaHa   = pf ? (pf.properties['Area Ha'] || pf.properties['Área Ha'] || 0) : 0;
+    const densidad = areaHa > 0 ? (paradas/areaHa).toFixed(2) : '—';
+    const sem      = getSemaforo(paradas, distKm, areaHa);
+    const color    = getColor(nRuta);
+
+    totalDist    += distKm; totalCosto  += costoTotal;
+    totalTiempo  += tTotalH; totalParadas += paradas;
+    if (areaHa > 0) { totalAreaHa += areaHa; rutasConArea++; }
+
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td style="color:'+color+'">'+idRuta+'</td>' +
+      '<td class="num">'+paradas+'</td>' +
+      '<td class="num">'+distKm.toFixed(1)+'</td>' +
+      '<td>'+formatTime(tViajeH)+'</td>' +
+      '<td>'+formatTime(tEntregaH)+'</td>' +
+      '<td class="num">'+formatTime(tTotalH)+'</td>' +
+      '<td>'+litros.toFixed(1)+' L</td>' +
+      '<td class="cost">$'+costoTotal.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td>' +
+      '<td>$'+(costoTotal/paradas).toFixed(2)+'</td>' +
+      '<td>'+(typeof densidad==='string'?densidad:densidad+' e/Ha')+'</td>' +
+      '<td><span class="semaforo '+sem.clase+'">'+sem.txt+'</span></td>';
+    tbody.appendChild(tr);
+  });
+
+  const dprom = rutasConArea > 0 ? (totalParadas/totalAreaHa).toFixed(2)+' e/Ha' : '—';
+  document.getElementById('s-rutas').textContent    = rutas.length;
+  document.getElementById('s-dist').textContent     = totalDist.toFixed(1)+' km';
+  document.getElementById('s-tiempo').textContent   = formatTime(totalTiempo);
+  document.getElementById('s-costo').textContent    = '$'+totalCosto.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('s-unitario').textContent = '$'+(totalCosto/totalParadas).toFixed(2);
+  document.getElementById('s-densidad').textContent = dprom;
+  document.getElementById('calc-summary').style.display    = 'block';
+  document.getElementById('calc-table-wrap').style.display = 'block';
+}
+
+document.getElementById('calc-run').addEventListener('click', runCalc);
+
+// ── ARRANQUE ──────────────────────────────────────────────────────────────────
+initMap();
+loadGeoJSON();

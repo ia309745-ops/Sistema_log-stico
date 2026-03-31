@@ -1,174 +1,76 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Dashboard Logístico · Última Milla</title>
-
-  <!-- Leaflet CSS -->
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
-
   <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
-  <!-- ═══ SIDEBAR ═══ -->
+  <!-- SIDEBAR -->
   <aside class="sidebar">
-
     <div class="sidebar-header">
-      <div class="logo-mark">
-        <span class="logo-icon">◈</span>
-      </div>
+      <div class="logo-mark"><span class="logo-icon">&#9672;</span></div>
       <div class="logo-text">
         <p class="logo-label">Sistema Logístico</p>
         <h1 class="logo-title">Última Milla</h1>
         <p class="logo-sub">Acapulco · 2025</p>
       </div>
     </div>
-
     <div class="divider"></div>
-
-    <!-- KPIs -->
     <div class="kpi-grid">
-      <div class="kpi-card" id="kpi-unidades">
+      <div class="kpi-card">
         <span class="kpi-value" id="kpi-val-unidades">—</span>
         <span class="kpi-label">Unidades en pantalla</span>
         <div class="kpi-bar"><div class="kpi-fill" id="kpi-fill-unidades"></div></div>
       </div>
-      <div class="kpi-card" id="kpi-ruta">
+      <div class="kpi-card">
         <span class="kpi-value" id="kpi-val-ruta">Todas</span>
         <span class="kpi-label">Ruta seleccionada</span>
       </div>
-      <div class="kpi-card" id="kpi-total">
+      <div class="kpi-card">
         <span class="kpi-value" id="kpi-val-total">—</span>
         <span class="kpi-label">Total de rutas</span>
       </div>
-      <div class="kpi-card" id="kpi-area">
+      <div class="kpi-card">
         <span class="kpi-value" id="kpi-val-area">—</span>
         <span class="kpi-label">Área de ruta (Ha)</span>
       </div>
     </div>
-
     <div class="divider"></div>
-
-    <!-- Filter -->
     <div class="filter-section">
       <label class="filter-label" for="route-select">
-        <span class="filter-icon">⊞</span> Filtrar por ruta
+        <span class="filter-icon">&#10753;</span> Filtrar por ruta
       </label>
       <div class="select-wrapper">
         <select id="route-select">
           <option value="all">Mostrar todas las rutas</option>
         </select>
-        <span class="select-arrow">▾</span>
+        <span class="select-arrow">&#9662;</span>
       </div>
     </div>
-
     <div class="divider"></div>
-
-    <!-- Route info panel -->
     <div class="route-panel" id="route-panel">
       <p class="route-panel-empty">Selecciona una ruta para ver el detalle del recorrido.</p>
     </div>
-
     <div class="sidebar-footer">
       <button class="method-btn" id="open-method">
-        <span class="method-btn-icon">◎</span> Metodología &amp; Contacto
+        <span class="method-btn-icon">&#9675;</span> Metodología &amp; Contacto
+      </button>
+      <button class="method-btn calc-btn" id="open-calc">
+        <span class="method-btn-icon">&#8863;</span> Calculadora de Costos
       </button>
       <div class="footer-credits">GIS · Leaflet.js · OSM</div>
     </div>
-
   </aside>
 
-  <!-- ═══ MODAL METODOLOGÍA ═══ -->
-  <div class="modal-backdrop" id="modal-backdrop">
-    <div class="modal" id="modal">
-
-      <div class="modal-header">
-        <div class="modal-title-block">
-          <span class="modal-icon">◎</span>
-          <div>
-            <h2 class="modal-title">Metodología de Optimización Espacial</h2>
-            <p class="modal-subtitle">Logística Urbana de Última Milla · Acapulco 2025</p>
-          </div>
-        </div>
-        <button class="modal-close" id="close-modal">✕</button>
-      </div>
-
-      <div class="modal-body">
-
-        <div class="phase-card">
-          <div class="phase-header">
-            <span class="phase-num">01</span>
-            <div>
-              <span class="phase-tag">Identificación de la Demanda</span>
-              <h3 class="phase-title">Análisis de Densidad de Kernel (KDE)</h3>
-            </div>
-          </div>
-          <p class="phase-desc">Transformar el inventario de unidades económicas (DENUE) en una superficie continua para localizar los focos térmicos de mayor demanda comercial, estableciendo las "semillas" iniciales de distribución.</p>
-        </div>
-
-        <div class="phase-card">
-          <div class="phase-header">
-            <span class="phase-num">02</span>
-            <div>
-              <span class="phase-tag">Macrolocalización y Agrupamiento</span>
-              <h3 class="phase-title">Clustering K-Means con Tolerancia de Capacidad</h3>
-            </div>
-          </div>
-          <p class="phase-desc">Segmentar la mancha urbana en "Territorios de Reparto" equilibrados (objetivo de 50 unidades, con holgura de expansión), asignando tiendas a su centroide más cercano mediante distancia euclidiana para evitar sesgos por errores en la red vial oficial.</p>
-        </div>
-
-        <div class="phase-card">
-          <div class="phase-header">
-            <span class="phase-num">03</span>
-            <div>
-              <span class="phase-tag">Validación Topológica · Intervención Humana</span>
-              <h3 class="phase-title">Depuración Espacial y Control de Calidad Geométrica</h3>
-            </div>
-          </div>
-          <p class="phase-desc">Inspeccionar visualmente los clústeres generados y reasignar manualmente las unidades económicas dispersas o afectadas por el "Efecto Frontera" hacia los polígonos más coherentes con la morfología urbana real y la conectividad de las colonias.</p>
-        </div>
-
-        <div class="phase-card">
-          <div class="phase-header">
-            <span class="phase-num">04</span>
-            <div>
-              <span class="phase-tag">Microlocalización y Secuenciación</span>
-              <h3 class="phase-title">TSP — Algoritmo del Vecino Más Cercano</h3>
-            </div>
-          </div>
-          <p class="phase-desc">Calcular el orden exacto de visita (<code>ORDEN_VISITA</code>) dentro de cada territorio ajustado, midiendo la distancia real sobre un grafo de calles proyectado a un sistema métrico estandarizado (tolerancia de 20 m para soldar cruceros rotos).</p>
-        </div>
-
-        <div class="phase-card">
-          <div class="phase-header">
-            <span class="phase-num">05</span>
-            <div>
-              <span class="phase-tag">Geovisualización y Ruteo Físico</span>
-              <h3 class="phase-title">Envolventes Convexas y Pathfinding de Trazos</h3>
-            </div>
-          </div>
-          <p class="phase-desc">Generar los polígonos definitivos que delimitan el área de cobertura de cada ruta y extraer las geometrías de las calles utilizadas (MultiLineStrings) para proyectar el recorrido físico del vehículo sobre el mapa.</p>
-        </div>
-
-        <div class="contact-block">
-          <span class="contact-icon">◈</span>
-          <div class="contact-info">
-            <p class="contact-name">Urb. Ismael Luna</p>
-            <a class="contact-email" href="mailto:ia309745@gmail.com">ia309745@gmail.com</a>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ MAIN MAP ═══ -->
+  <!-- MAPA -->
   <main class="main-content">
     <div id="map"></div>
     <div class="map-overlay-top">
@@ -179,8 +81,174 @@
     </div>
   </main>
 
-  <!-- Leaflet JS -->
+  <!-- MODAL METODOLOGIA -->
+  <div class="modal-backdrop" id="modal-backdrop">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <div class="modal-title-block">
+          <span class="modal-icon">&#9675;</span>
+          <div>
+            <h2 class="modal-title">Metodología de Optimización Espacial</h2>
+            <p class="modal-subtitle">Logística Urbana de Última Milla · Acapulco 2025</p>
+          </div>
+        </div>
+        <button class="modal-close" id="close-modal">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <div class="method-box">
+          <div class="timeline">
+            <div class="phase-row">
+              <div class="phase-left"><div class="phase-num">01</div><div class="phase-line"></div></div>
+              <div class="phase-content">
+                <span class="phase-tag">Identificación de la Demanda</span>
+                <h3 class="phase-title">Análisis de Densidad de Kernel (KDE)</h3>
+                <p class="phase-desc">El punto de partida es el directorio DENUE. Aplicamos un <strong>Análisis de Densidad de Kernel</strong> para convertir ese catálogo en una superficie térmica continua: las zonas con mayor concentración de negocios emergen como focos prioritarios de atención, permitiendo al equipo directivo <em>ver</em> dónde está realmente el volumen comercial.</p>
+              </div>
+            </div>
+            <div class="phase-row">
+              <div class="phase-left"><div class="phase-num">02</div><div class="phase-line"></div></div>
+              <div class="phase-content">
+                <span class="phase-tag">Macrolocalización y Agrupamiento</span>
+                <h3 class="phase-title">Clustering K-Means con Capacidad Controlada</h3>
+                <p class="phase-desc">Aplicamos <strong>agrupamiento K-Means</strong> que divide la ciudad en "Territorios de Reparto" equilibrados. El sistema calcula automáticamente cuántas rutas se necesitan (objetivo 50 entregas/vehículo). La asignación por proximidad geográfica garantiza carga de trabajo comparable y recorridos compactos.</p>
+              </div>
+            </div>
+            <div class="phase-row">
+              <div class="phase-left"><div class="phase-num">03</div><div class="phase-line"></div></div>
+              <div class="phase-content">
+                <span class="phase-tag">Validación Topológica · Intervención Humana</span>
+                <h3 class="phase-title">Depuración Espacial y Control de Calidad</h3>
+                <p class="phase-desc">Se revisan los clústeres en mapa y se corrigen los casos incoherentes. El principal fenómeno a corregir es el <em>"Efecto Frontera"</em>, donde unidades en los límites de dos territorios quedan asignadas a rutas con cruces innecesarios de colonias o barreras físicas.</p>
+              </div>
+            </div>
+            <div class="phase-row">
+              <div class="phase-left"><div class="phase-num">04</div><div class="phase-line"></div></div>
+              <div class="phase-content">
+                <span class="phase-tag">Microlocalización y Secuenciación</span>
+                <h3 class="phase-title">TSP — Algoritmo del Vecino Más Cercano</h3>
+                <p class="phase-desc">Resolvemos el orden óptimo de visita con una heurística del <strong>Problema del Viajero (TSP)</strong>. Las distancias se calculan sobre un grafo real de calles con tolerancia de 20 m. El resultado es el campo <code>ORDEN_VISITA</code> que cada conductor sigue en secuencia.</p>
+              </div>
+            </div>
+            <div class="phase-row">
+              <div class="phase-left"><div class="phase-num">05</div><div class="phase-line"></div></div>
+              <div class="phase-content">
+                <span class="phase-tag">Geovisualización y Ruteo Físico</span>
+                <h3 class="phase-title">Polígonos de Cobertura y Trazado de Recorrido</h3>
+                <p class="phase-desc">La fase final convierte los resultados en <strong>herramientas de gestión visual</strong>: polígonos de área de responsabilidad por ruta y trazado físico sobre el callejero real. Este dashboard es el producto: una plataforma donde supervisores monitorean, filtran, analizan y descargan cada ruta.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="contact-block">
+          <span class="contact-icon">&#9672;</span>
+          <p class="contact-name">Urb. Ismael Luna</p>
+          <a class="contact-email" href="mailto:ia309745@gmail.com">ia309745@gmail.com</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CALCULADORA -->
+  <div class="modal-backdrop" id="calc-backdrop">
+    <div class="modal modal-wide" id="calc-modal">
+      <div class="modal-header">
+        <div class="modal-title-block">
+          <span class="modal-icon">&#8863;</span>
+          <div>
+            <h2 class="modal-title">Calculadora de Costos Logísticos</h2>
+            <p class="modal-subtitle">Análisis costo-beneficio por ruta · Acapulco 2025</p>
+          </div>
+        </div>
+        <button class="modal-close" id="close-calc">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <div class="calc-section">
+          <span class="calc-section-label">Parámetros de la flota</span>
+          <div class="calc-params-grid">
+            <div class="calc-param">
+              <label class="calc-label">Tipo de combustible</label>
+              <div class="select-wrapper">
+                <select id="c-tipo">
+                  <option value="regular">Gasolina regular</option>
+                  <option value="premium">Gasolina premium</option>
+                  <option value="diesel">Diésel</option>
+                </select>
+                <span class="select-arrow">&#9662;</span>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Precio combustible ($/litro)</label>
+              <div class="calc-input-wrap">
+                <span class="calc-input-prefix">$</span>
+                <input type="number" id="c-precio" class="calc-input" value="23.50" min="1" step="0.10"/>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Rendimiento (km/litro)</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="c-rendimiento" class="calc-input" value="10" min="1" step="0.5"/>
+                <span class="calc-input-suffix">km/l</span>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Velocidad promedio (km/h)</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="c-velocidad" class="calc-input" value="25" min="5" step="5"/>
+                <span class="calc-input-suffix">km/h</span>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Tiempo por entrega (min)</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="c-tiempo-entrega" class="calc-input" value="8" min="1" step="1"/>
+                <span class="calc-input-suffix">min</span>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Costo fijo adicional por ruta ($)</label>
+              <div class="calc-input-wrap">
+                <span class="calc-input-prefix">$</span>
+                <input type="number" id="c-adicional" class="calc-input" value="0" min="0" step="10"/>
+              </div>
+            </div>
+          </div>
+          <button class="calc-run-btn" id="calc-run">Calcular todas las rutas</button>
+        </div>
+        <div class="calc-summary" id="calc-summary" style="display:none">
+          <div class="calc-summary-title">Resumen operativo diario</div>
+          <div class="calc-summary-grid">
+            <div class="calc-kpi-box"><span class="calc-kpi-val" id="s-rutas">—</span><span class="calc-kpi-lbl">Rutas activas</span></div>
+            <div class="calc-kpi-box"><span class="calc-kpi-val" id="s-dist">—</span><span class="calc-kpi-lbl">Distancia total km</span></div>
+            <div class="calc-kpi-box"><span class="calc-kpi-val" id="s-tiempo">—</span><span class="calc-kpi-lbl">Tiempo total estimado</span></div>
+            <div class="calc-kpi-box accent"><span class="calc-kpi-val" id="s-costo">—</span><span class="calc-kpi-lbl">Costo total del día</span></div>
+            <div class="calc-kpi-box"><span class="calc-kpi-val" id="s-unitario">—</span><span class="calc-kpi-lbl">Costo por entrega</span></div>
+            <div class="calc-kpi-box"><span class="calc-kpi-val" id="s-densidad">—</span><span class="calc-kpi-lbl">Densidad prom. ent/Ha</span></div>
+          </div>
+        </div>
+        <div id="calc-table-wrap" style="display:none">
+          <div class="calc-section-label" style="margin-bottom:10px">Detalle por ruta</div>
+          <div class="calc-table-scroll">
+            <table class="calc-table">
+              <thead>
+                <tr>
+                  <th>Ruta</th><th>Paradas</th><th>Dist. km</th>
+                  <th>T. viaje</th><th>T. entregas</th><th>T. total</th>
+                  <th>Litros</th><th>Costo $</th><th>$/entrega</th>
+                  <th>Densidad</th><th>Semáforo</th>
+                </tr>
+              </thead>
+              <tbody id="calc-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

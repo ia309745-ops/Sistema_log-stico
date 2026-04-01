@@ -524,3 +524,125 @@ document.getElementById('calc-run').addEventListener('click', runCalc);
 // ── ARRANQUE ──────────────────────────────────────────────────────────────────
 initMap();
 loadGeoJSON();
+
+// ── ANÁLISIS DE CAPACIDAD DE CARGA ────────────────────────────────────────────
+
+function pctClass(pct) {
+  if (pct > 100) return 'alert';
+  if (pct >= 85)  return 'warn';
+  if (pct < 50)   return 'low';
+  return 'ok';
+}
+
+function capCell(valor, unidad, pct) {
+  const cls = pctClass(pct);
+  const barW = Math.min(pct, 100).toFixed(0);
+  return `<td>
+    <span class="cap-bar-wrap"><span class="cap-bar ${cls}" style="width:${barW}%"></span></span>
+    <span class="cap-pct ${cls}">${pct.toFixed(0)}%</span>
+  </td>`;
+}
+
+function estadoCarga(pcts, viajes) {
+  const max = Math.max(...pcts);
+  if (max > 100) return '<span class="semaforo alert">&#9888; Sobrecarga</span>';
+  if (viajes > 1) return '<span class="semaforo viajes">&#11119; '+viajes+' viajes</span>';
+  if (max < 50)  return '<span class="semaforo warn">&#9680; Subutilizado</span>';
+  if (max >= 85)  return '<span class="semaforo warn">&#9650; Carga alta</span>';
+  return '<span class="semaforo ok">&#10003; Óptimo</span>';
+}
+
+function runCargo() {
+  if (allFeatures.length === 0) return;
+
+  // Capacidades máximas del vehículo
+  const capPeso   = parseFloat(document.getElementById('cap-peso').value)   || 3000;
+  const capVol    = parseFloat(document.getElementById('cap-vol').value)    || 12;
+  const capPallet = parseFloat(document.getElementById('cap-pallets').value)|| 8;
+  const capCajas  = parseFloat(document.getElementById('cap-cajas').value)  || 200;
+
+  // Promedios por parada
+  const parPeso   = parseFloat(document.getElementById('par-peso').value)   || 25;
+  const parVol    = parseFloat(document.getElementById('par-vol').value)    || 0.05;
+  const parPallet = parseFloat(document.getElementById('par-pallets').value)|| 0.1;
+  const parCajas  = parseFloat(document.getElementById('par-cajas').value)  || 4;
+
+  // Agrupar features por ID_RUTA
+  const rutasMap = {};
+  allFeatures.forEach(f => {
+    const id = f.properties.ID_RUTA;
+    if (!rutasMap[id]) rutasMap[id] = [];
+    rutasMap[id].push(f);
+  });
+
+  const rutas = Object.keys(rutasMap).sort((a,b) =>
+    parseInt(a.replace(/\D/g,'')) - parseInt(b.replace(/\D/g,''))
+  );
+
+  let totalPeso = 0, totalVol = 0, totalCajas = 0;
+  let rutasSobrecarga = 0, rutasSub = 0;
+  let sumaPctPeso = 0;
+
+  const tbody = document.getElementById('cargo-tbody');
+  tbody.innerHTML = '';
+
+  rutas.forEach(idRuta => {
+    const features = rutasMap[idRuta];
+    const nRuta    = features[0].properties.N_RUTA;
+    const paradas  = features.length;
+    const color    = getColor(nRuta);
+
+    const peso   = paradas * parPeso;
+    const vol    = paradas * parVol;
+    const pallet = paradas * parPallet;
+    const cajas  = paradas * parCajas;
+
+    const pctPeso   = (peso   / capPeso)   * 100;
+    const pctVol    = (vol    / capVol)    * 100;
+    const pctPallet = (pallet / capPallet) * 100;
+    const pctCajas  = (cajas  / capCajas)  * 100;
+
+    // Viajes necesarios (basado en el factor más limitante)
+    const factorMax = Math.max(pctPeso, pctVol, pctPallet, pctCajas) / 100;
+    const viajes    = Math.ceil(factorMax);
+
+    totalPeso  += peso;
+    totalVol   += vol;
+    totalCajas += cajas;
+    sumaPctPeso += pctPeso;
+
+    const maxPct = Math.max(pctPeso, pctVol, pctPallet, pctCajas);
+    if (maxPct > 100) rutasSobrecarga++;
+    if (maxPct < 50)  rutasSub++;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td style="color:${color}">${idRuta}</td>` +
+      `<td class="num">${paradas}</td>` +
+      `<td class="num">${peso.toFixed(0)} kg</td>` +
+      capCell(peso, 'kg', pctPeso) +
+      `<td class="num">${vol.toFixed(2)} m³</td>` +
+      capCell(vol, 'm³', pctVol) +
+      `<td class="num">${pallet.toFixed(1)}</td>` +
+      capCell(pallet, 'p', pctPallet) +
+      `<td class="num">${cajas.toFixed(0)}</td>` +
+      capCell(cajas, 'c', pctCajas) +
+      `<td class="num" style="${viajes > 1 ? 'color:var(--warn);font-weight:700' : ''}">${viajes}</td>` +
+      `<td>${estadoCarga([pctPeso,pctVol,pctPallet,pctCajas], viajes)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Resumen
+  const usoProm = rutas.length > 0 ? (sumaPctPeso / rutas.length).toFixed(0) + '%' : '—';
+  document.getElementById('cs-viajes').textContent     = rutasSobrecarga;
+  document.getElementById('cs-sub').textContent        = rutasSub;
+  document.getElementById('cs-peso-total').textContent = totalPeso.toLocaleString('es-MX', {maximumFractionDigits:0}) + ' kg';
+  document.getElementById('cs-uso-prom').textContent   = usoProm;
+  document.getElementById('cs-vol-total').textContent  = totalVol.toFixed(1) + ' m³';
+  document.getElementById('cs-cajas-total').textContent= totalCajas.toLocaleString('es-MX', {maximumFractionDigits:0});
+
+  document.getElementById('cargo-summary').style.display    = 'block';
+  document.getElementById('cargo-table-wrap').style.display = 'block';
+}
+
+document.getElementById('cargo-run').addEventListener('click', runCargo);

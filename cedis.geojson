@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "cedis",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::8999" } },
+"features": [
+{ "type": "Feature", "properties": { "Name": "ACAPULCO", "X": "16.902082", "Y": "-99.829071" }, "geometry": { "type": "Point", "coordinates": [ -99.829071, 16.902082, 0.0 ] } }
+]
+}

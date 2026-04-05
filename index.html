@@ -60,6 +60,9 @@
       <p class="route-panel-empty">Selecciona una ruta para ver el detalle del recorrido.</p>
     </div>
     <div class="sidebar-footer">
+      <button class="method-btn cedis-btn" id="open-cedis">
+        <span class="method-btn-icon">&#8857;</span> Análisis CEDIS
+      </button>
       <button class="method-btn" id="open-method">
         <span class="method-btn-icon">&#9675;</span> Metodología &amp; Contacto
       </button>
@@ -80,6 +83,22 @@
       </div>
     </div>
   </main>
+
+  <!-- PANEL CEDIS (lateral derecho sobre el mapa) -->
+  <div class="cedis-panel" id="cedis-panel">
+    <div class="cedis-panel-header">
+      <div class="cedis-panel-title">
+        <span class="cedis-panel-icon">&#8857;</span>
+        <div>
+          <div class="cedis-panel-name" id="cedis-name">CEDIS</div>
+          <div class="cedis-panel-sub">Ranking de distancia por territorio</div>
+        </div>
+      </div>
+      <button class="modal-close" id="close-cedis">&#10005;</button>
+    </div>
+    <div class="cedis-summary" id="cedis-summary"></div>
+    <div class="cedis-list" id="cedis-list"></div>
+  </div>
 
   <!-- MODAL METODOLOGIA -->
   <div class="modal-backdrop" id="modal-backdrop">
@@ -142,7 +161,7 @@
         <div class="contact-block">
           <span class="contact-icon">&#9672;</span>
           <p class="contact-name">Urb. Ismael Luna</p>
-          <a class="contact-email" href="mailto:ia309745@gmail.com">ia309745@gmail.com</a>
+          <span class="contact-email">ia309745@gmail.com</span>
         </div>
       </div>
     </div>
@@ -241,13 +260,9 @@
             </table>
           </div>
         </div>
-
-        <!-- ── SECCIÓN CAPACIDAD DE CARGA ── -->
         <div class="calc-section cargo-section">
           <span class="calc-section-label">&#9711; Análisis de capacidad de carga por vehículo</span>
-
           <div class="cargo-grid">
-
             <div class="cargo-col">
               <div class="cargo-col-title">Capacidad máxima del vehículo</div>
               <div class="calc-param">
@@ -279,7 +294,6 @@
                 </div>
               </div>
             </div>
-
             <div class="cargo-col">
               <div class="cargo-col-title">Promedio por parada (entrega estándar)</div>
               <div class="calc-param">
@@ -311,13 +325,9 @@
                 </div>
               </div>
             </div>
-
           </div>
-
           <button class="calc-run-btn cargo-run-btn" id="cargo-run">Analizar capacidad de carga</button>
         </div>
-
-        <!-- Resumen carga -->
         <div class="calc-summary" id="cargo-summary" style="display:none">
           <div class="calc-summary-title">Resumen de carga · flota completa</div>
           <div class="calc-summary-grid">
@@ -329,33 +339,24 @@
             <div class="calc-kpi-box"><span class="calc-kpi-val" id="cs-cajas-total">—</span><span class="calc-kpi-lbl">Cajas totales (flota)</span></div>
           </div>
         </div>
-
-        <!-- Tabla carga -->
         <div id="cargo-table-wrap" style="display:none">
           <div class="calc-section-label" style="margin-bottom:10px">&#9635; Detalle de carga por ruta</div>
           <div class="calc-table-scroll">
             <table class="calc-table">
               <thead>
                 <tr>
-                  <th>Ruta</th>
-                  <th>Paradas</th>
-                  <th>Peso total</th>
-                  <th>% peso</th>
-                  <th>Volumen</th>
-                  <th>% vol</th>
-                  <th>Pallets</th>
-                  <th>% pallets</th>
-                  <th>Cajas</th>
-                  <th>% cajas</th>
-                  <th>Viajes</th>
-                  <th>Estado</th>
+                  <th>Ruta</th><th>Paradas</th>
+                  <th>Peso total</th><th>% peso</th>
+                  <th>Volumen</th><th>% vol</th>
+                  <th>Pallets</th><th>% pallets</th>
+                  <th>Cajas</th><th>% cajas</th>
+                  <th>Viajes</th><th>Estado</th>
                 </tr>
               </thead>
               <tbody id="cargo-tbody"></tbody>
             </table>
           </div>
         </div>
-
       </div>
     </div>
   </div>

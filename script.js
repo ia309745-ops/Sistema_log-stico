@@ -646,3 +646,244 @@ function runCargo() {
 }
 
 document.getElementById('cargo-run').addEventListener('click', runCargo);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO CEDIS — Análisis de distancia desde Centro de Distribución
+// ══════════════════════════════════════════════════════════════════════════════
+
+const CEDIS_PATH = 'cedis.geojson';
+
+let cedisData       = null;   // feature del CEDIS
+let cedisMarker     = null;   // marcador Leaflet
+let cedisLines      = [];     // líneas CEDIS→centroide
+let cedisResults    = [];     // resultados calculados [{idRuta,dist,paradas,areaHa,efic}]
+let cedisActive     = false;
+
+// ── Calcular centroide de un polígono/multipolígono ───────────────────────────
+function calcCentroid(feature) {
+  const coords = [];
+  const geom = feature.geometry;
+
+  function collectRing(ring) {
+    ring.forEach(pt => coords.push(pt));
+  }
+
+  if (geom.type === 'Polygon') {
+    collectRing(geom.coordinates[0]);
+  } else if (geom.type === 'MultiPolygon') {
+    geom.coordinates.forEach(poly => collectRing(poly[0]));
+  }
+
+  if (coords.length === 0) return null;
+  const lng = coords.reduce((s, p) => s + p[0], 0) / coords.length;
+  const lat = coords.reduce((s, p) => s + p[1], 0) / coords.length;
+  return [lat, lng];
+}
+
+// ── Colores por distancia (frío=cercano, caliente=lejano) ─────────────────────
+function distColor(pct) {
+  if (pct <= 0.25) return '#00e5a0';   // verde  — muy cercano
+  if (pct <= 0.50) return '#ffd93d';   // amarillo
+  if (pct <= 0.75) return '#ff9f43';   // naranja
+  return '#ff4d6d';                     // rojo   — muy lejano
+}
+
+// ── Abrir / cerrar panel ──────────────────────────────────────────────────────
+function openCedisPanel()  {
+  document.getElementById('cedis-panel').classList.add('open');
+}
+function closeCedisPanel() {
+  document.getElementById('cedis-panel').classList.remove('open');
+  clearCedisLayers();
+  cedisActive = false;
+}
+
+function clearCedisLayers() {
+  if (cedisMarker) { map.removeLayer(cedisMarker); cedisMarker = null; }
+  cedisLines.forEach(l => map.removeLayer(l));
+  cedisLines = [];
+}
+
+// ── Análisis principal ────────────────────────────────────────────────────────
+async function runCedisAnalysis() {
+  // Cargar CEDIS si no está cargado
+  if (!cedisData) {
+    try {
+      const res = await fetch(CEDIS_PATH);
+      if (!res.ok) throw new Error('No se encontró cedis.geojson');
+      const gj = await res.json();
+      cedisData = gj.features ? gj.features[0] : gj;
+    } catch (err) {
+      alert('Error: ' + err.message + '\nVerifica que cedis.geojson esté en la carpeta del proyecto.');
+      return;
+    }
+  }
+
+  // Verificar que tengamos polígonos
+  if (allPolygons.length === 0) {
+    alert('No se encontraron polígonos de rutas. Asegúrate de que poligonos.geojson esté cargado.');
+    return;
+  }
+
+  clearCedisLayers();
+
+  // Coordenadas del CEDIS
+  const cedisCoords = cedisData.geometry.coordinates;
+  const cedisLat    = cedisCoords[1];
+  const cedisLng    = cedisCoords[0];
+  const cedisNombre = cedisData.properties.nombre ||
+                      cedisData.properties.NOMBRE ||
+                      cedisData.properties.name   ||
+                      'CEDIS Principal';
+
+  // Marcador CEDIS
+  const cedisIcon = L.divIcon({
+    className: 'cedis-marker-icon',
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  });
+  cedisMarker = L.marker([cedisLat, cedisLng], { icon: cedisIcon })
+    .addTo(map)
+    .bindPopup(`<div class="popup-inner">
+      <div class="popup-ruta" style="color:#6bceff">&#8857; ${cedisNombre}</div>
+      <div class="popup-parada">Centro de Distribución</div>
+      <div class="popup-parada">Lat: <span>${cedisLat.toFixed(5)}</span></div>
+      <div class="popup-parada">Lng: <span>${cedisLng.toFixed(5)}</span></div>
+    </div>`);
+
+  // Calcular distancia a cada polígono
+  cedisResults = [];
+
+  allPolygons.forEach(polyFeat => {
+    const nRuta   = polyFeat.properties.N_RUTA;
+    const areaHa  = polyFeat.properties['Area Ha'] || polyFeat.properties['Área Ha'] || 0;
+    const centroid = calcCentroid(polyFeat);
+    if (!centroid) return;
+
+    const [cLat, cLng] = centroid;
+    const distKm = haversine(cedisLat, cedisLng, cLat, cLng);
+
+    // Paradas de esta ruta
+    const paradas = allFeatures.filter(f => f.properties.N_RUTA === nRuta).length;
+
+    // Eficiencia: paradas por km desde CEDIS (mayor = más eficiente)
+    const eficiencia = distKm > 0 ? (paradas / distKm).toFixed(2) : 0;
+
+    // ID_RUTA desde los features
+    const idRuta = allFeatures.find(f => f.properties.N_RUTA === nRuta)?.properties.ID_RUTA || 'Ruta_' + nRuta;
+
+    cedisResults.push({ nRuta, idRuta, distKm, paradas, areaHa, eficiencia, centroid });
+  });
+
+  // Ordenar por distancia
+  cedisResults.sort((a, b) => a.distKm - b.distKm);
+
+  const maxDist = cedisResults[cedisResults.length - 1]?.distKm || 1;
+  const maxEfic = Math.max(...cedisResults.map(r => parseFloat(r.eficiencia)));
+
+  // Dibujar líneas CEDIS → centroide
+  cedisResults.forEach(r => {
+    const pct   = r.distKm / maxDist;
+    const color = distColor(pct);
+    const weight = Math.max(1, 3 - pct * 2);
+
+    const line = L.polyline(
+      [[cedisLat, cedisLng], r.centroid],
+      { color, weight, opacity: 0.7, dashArray: '4 3' }
+    ).addTo(map);
+
+    line.bindPopup(`<div class="popup-inner">
+      <div class="popup-ruta" style="color:${color}">&#9672; ${r.idRuta}</div>
+      <div class="popup-parada">Distancia CEDIS: <span>${r.distKm.toFixed(2)} km</span></div>
+      <div class="popup-parada">Paradas: <span>${r.paradas}</span></div>
+      <div class="popup-parada">Eficiencia: <span>${r.eficiencia} paradas/km</span></div>
+    </div>`);
+
+    cedisLines.push(line);
+  });
+
+  // Hacer zoom para ver todo
+  const allPts = [[cedisLat, cedisLng], ...cedisResults.map(r => r.centroid)];
+  map.fitBounds(allPts, { padding: [40, 40] });
+
+  // Actualizar panel
+  document.getElementById('cedis-name').textContent = cedisNombre;
+  renderCedisSummary(cedisResults, maxDist);
+  renderCedisList(cedisResults, maxDist, maxEfic);
+  openCedisPanel();
+  cedisActive = true;
+}
+
+// ── Resumen KPIs ──────────────────────────────────────────────────────────────
+function renderCedisSummary(results, maxDist) {
+  const distProm = (results.reduce((s,r) => s + r.distKm, 0) / results.length).toFixed(1);
+  const cercana  = results[0];
+  const lejana   = results[results.length - 1];
+
+  document.getElementById('cedis-summary').innerHTML = `
+    <div class="cedis-kpi">
+      <span class="cedis-kpi-val">${results.length}</span>
+      <span class="cedis-kpi-lbl">Territorios</span>
+    </div>
+    <div class="cedis-kpi">
+      <span class="cedis-kpi-val">${distProm}</span>
+      <span class="cedis-kpi-lbl">km promedio</span>
+    </div>
+    <div class="cedis-kpi">
+      <span class="cedis-kpi-val">${lejana.distKm.toFixed(1)}</span>
+      <span class="cedis-kpi-lbl">km máx</span>
+    </div>`;
+}
+
+// ── Lista ranking ─────────────────────────────────────────────────────────────
+function renderCedisList(results, maxDist, maxEfic) {
+  const list = document.getElementById('cedis-list');
+  list.innerHTML = results.map((r, i) => {
+    const pct      = r.distKm / maxDist;
+    const color    = getColor(r.nRuta);
+    const eficPct  = maxEfic > 0 ? (parseFloat(r.eficiencia) / maxEfic * 100).toFixed(0) : 0;
+    const rankCls  = i < 3 ? 'top' : '';
+
+    return `<div class="cedis-item" data-nruta="${r.nRuta}" onclick="cedisItemClick(${r.nRuta})">
+      <div class="cedis-rank ${rankCls}">#${i+1}</div>
+      <div class="cedis-item-info">
+        <div class="cedis-item-ruta" style="color:${color}">${r.idRuta}</div>
+        <div class="cedis-item-meta">
+          ${r.paradas} paradas · ${r.areaHa ? r.areaHa + ' Ha' : 'sin área'}
+          · ${r.eficiencia} p/km
+        </div>
+        <div class="cedis-eff-bar">
+          <div class="cedis-eff-fill" style="width:${eficPct}%;background:${distColor(pct)}"></div>
+        </div>
+      </div>
+      <div class="cedis-item-dist">
+        <span class="cedis-dist-val" style="color:${distColor(pct)}">${r.distKm.toFixed(1)}</span>
+        <span class="cedis-dist-lbl">km</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Clic en ítem del ranking → zoom a esa ruta ───────────────────────────────
+function cedisItemClick(nRuta) {
+  const r = cedisResults.find(x => x.nRuta === nRuta);
+  if (!r) return;
+
+  // Resaltar ítem activo
+  document.querySelectorAll('.cedis-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`[data-nruta="${nRuta}"]`)?.classList.add('active');
+
+  // Zoom al centroide del polígono
+  map.flyTo(r.centroid, 14, { duration: 1 });
+
+  // Seleccionar la ruta en el dropdown
+  const sel = document.getElementById('route-select');
+  if (sel.value !== r.idRuta) {
+    sel.value = r.idRuta;
+    renderRoute(r.idRuta);
+  }
+}
+
+// ── Eventos ───────────────────────────────────────────────────────────────────
+document.getElementById('open-cedis').addEventListener('click', runCedisAnalysis);
+document.getElementById('close-cedis').addEventListener('click', closeCedisPanel);

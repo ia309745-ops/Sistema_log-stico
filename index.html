@@ -69,6 +69,9 @@
       <button class="method-btn calc-btn" id="open-calc">
         <span class="method-btn-icon">&#8863;</span> Calculadora de Costos
       </button>
+      <button class="method-btn sim-btn" id="open-sim">
+        <span class="method-btn-icon">&#9651;</span> Simulador de Ahorros
+      </button>
       <div class="footer-credits">GIS · Leaflet.js · OSM</div>
     </div>
   </aside>
@@ -356,6 +359,188 @@
               <tbody id="cargo-tbody"></tbody>
             </table>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL SIMULADOR DE AHORROS -->
+  <div class="modal-backdrop" id="sim-backdrop">
+    <div class="modal modal-wide" id="sim-modal">
+      <div class="modal-header">
+        <div class="modal-title-block">
+          <span class="modal-icon">&#9651;</span>
+          <div>
+            <h2 class="modal-title">Simulador de Ahorro Logístico</h2>
+            <p class="modal-subtitle">Proyección mensual · anual · 5 años · modelo de cobro por ahorro</p>
+          </div>
+        </div>
+        <button class="modal-close" id="close-sim">&#10005;</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Parámetros operación ANTES -->
+        <div class="sim-cols">
+          <div class="sim-col">
+            <div class="sim-col-header antes">Operación ANTES de la optimización</div>
+            <div class="calc-param">
+              <label class="calc-label">Rutas/vehículos operando</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="s-ant-rutas" class="calc-input" value="90" min="1"/>
+                <span class="calc-input-suffix">rutas</span>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Km promedio por ruta/día</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="s-ant-km" class="calc-input" value="45" min="1"/>
+                <span class="calc-input-suffix">km</span>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Entregas completadas por ruta/día</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="s-ant-entregas" class="calc-input" value="35" min="1"/>
+                <span class="calc-input-suffix">entregas</span>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Horas de operación por ruta/día</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="s-ant-horas" class="calc-input" value="9" min="1"/>
+                <span class="calc-input-suffix">horas</span>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Costo hora-operador ($/hora)</label>
+              <div class="calc-input-wrap">
+                <span class="calc-input-prefix">$</span>
+                <input type="number" id="s-ant-costo-hora" class="calc-input" value="85" min="1"/>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Rendimiento combustible (km/l)</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="s-ant-rend" class="calc-input" value="9" min="1" step="0.5"/>
+                <span class="calc-input-suffix">km/l</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="sim-col">
+            <div class="sim-col-header despues">Operación DESPUÉS de la optimización</div>
+            <div class="calc-param">
+              <label class="calc-label">Rutas optimizadas</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="s-opt-rutas" class="calc-input" value="71" min="1"/>
+                <span class="calc-input-suffix">rutas</span>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Km promedio por ruta/día</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="s-opt-km" class="calc-input" value="28" min="1"/>
+                <span class="calc-input-suffix">km</span>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Entregas completadas por ruta/día</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="s-opt-entregas" class="calc-input" value="50" min="1"/>
+                <span class="calc-input-suffix">entregas</span>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Horas de operación por ruta/día</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="s-opt-horas" class="calc-input" value="7" min="1"/>
+                <span class="calc-input-suffix">horas</span>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Costo hora-operador ($/hora)</label>
+              <div class="calc-input-wrap">
+                <span class="calc-input-prefix">$</span>
+                <input type="number" id="s-opt-costo-hora" class="calc-input" value="85" min="1"/>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Rendimiento combustible (km/l)</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="s-opt-rend" class="calc-input" value="10" min="1" step="0.5"/>
+                <span class="calc-input-suffix">km/l</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parámetros globales -->
+        <div class="calc-section" style="margin-top:0">
+          <span class="calc-section-label">Parámetros globales de la simulación</span>
+          <div class="calc-params-grid">
+            <div class="calc-param">
+              <label class="calc-label">Precio combustible ($/litro)</label>
+              <div class="calc-input-wrap">
+                <span class="calc-input-prefix">$</span>
+                <input type="number" id="s-precio" class="calc-input" value="23.50" step="0.10"/>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Días hábiles por mes</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="s-dias" class="calc-input" value="25" min="1"/>
+                <span class="calc-input-suffix">días</span>
+              </div>
+            </div>
+            <div class="calc-param">
+              <label class="calc-label">Inversión del proyecto (MXN)</label>
+              <div class="calc-input-wrap">
+                <span class="calc-input-prefix">$</span>
+                <input type="number" id="s-inversion" class="calc-input" value="1335000" min="0" step="1000"/>
+              </div>
+            </div>
+          </div>
+          <button class="calc-run-btn sim-run-btn" id="sim-run">Calcular ahorro y proyección</button>
+        </div>
+
+        <!-- Resultados diarios -->
+        <div id="sim-results" style="display:none">
+
+          <!-- KPIs comparativos -->
+          <div class="sim-compare-grid" id="sim-compare"></div>
+
+          <!-- Proyección financiera -->
+          <div class="calc-summary" id="sim-financial">
+            <div class="calc-summary-title">Proyección financiera del ahorro</div>
+            <div class="calc-summary-grid" id="sim-kpis"></div>
+          </div>
+
+          <!-- Tabla de proyección 5 años -->
+          <div>
+            <div class="calc-section-label" style="margin-bottom:10px">Proyección acumulada del ahorro (mensual y anual)</div>
+            <div class="calc-table-scroll">
+              <table class="calc-table" id="sim-table">
+                <thead>
+                  <tr>
+                    <th>Período</th>
+                    <th>Ahorro del período</th>
+                    <th>Ahorro acumulado</th>
+                    <th>Inversión pendiente</th>
+                    <th>ROI acumulado</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="sim-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Modelo de cobro por ahorro -->
+          <div class="calc-section" style="margin-top:0">
+            <span class="calc-section-label">&#9670; Modelo de cobro por porcentaje del ahorro generado</span>
+            <div class="sim-fee-grid" id="sim-fee-grid"></div>
+          </div>
+
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════ */
 
 const GEOJSON_PATH  = 'rutas_optimizadas.geojson';
-const POLYGONS_PATH = 'polígonos.geojson';
+const POLYGONS_PATH = 'poligonos.geojson';
 
 // ── PALETA ────────────────────────────────────────────────────────────────────
 const PALETTE = [
@@ -887,3 +887,208 @@ function cedisItemClick(nRuta) {
 // ── Eventos ───────────────────────────────────────────────────────────────────
 document.getElementById('open-cedis').addEventListener('click', runCedisAnalysis);
 document.getElementById('close-cedis').addEventListener('click', closeCedisPanel);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO SIMULADOR DE AHORROS
+// ══════════════════════════════════════════════════════════════════════════════
+
+function fmtMXN(n) {
+  return '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtNum(n, dec=1) {
+  return Number(n).toLocaleString('es-MX', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function fmtPct(n) { return fmtNum(n, 1) + '%'; }
+
+function runSimulator() {
+  // ── Leer parámetros ANTES ─────────────────────────────────────────────────
+  const antRutas      = parseFloat(document.getElementById('s-ant-rutas').value)      || 90;
+  const antKm         = parseFloat(document.getElementById('s-ant-km').value)         || 45;
+  const antEntregas   = parseFloat(document.getElementById('s-ant-entregas').value)   || 35;
+  const antHoras      = parseFloat(document.getElementById('s-ant-horas').value)      || 9;
+  const antCostoHora  = parseFloat(document.getElementById('s-ant-costo-hora').value) || 85;
+  const antRend       = parseFloat(document.getElementById('s-ant-rend').value)       || 9;
+
+  // ── Leer parámetros DESPUÉS ───────────────────────────────────────────────
+  const optRutas      = parseFloat(document.getElementById('s-opt-rutas').value)      || 71;
+  const optKm         = parseFloat(document.getElementById('s-opt-km').value)         || 28;
+  const optEntregas   = parseFloat(document.getElementById('s-opt-entregas').value)   || 50;
+  const optHoras      = parseFloat(document.getElementById('s-opt-horas').value)      || 7;
+  const optCostoHora  = parseFloat(document.getElementById('s-opt-costo-hora').value) || 85;
+  const optRend       = parseFloat(document.getElementById('s-opt-rend').value)       || 10;
+
+  // ── Parámetros globales ───────────────────────────────────────────────────
+  const precio    = parseFloat(document.getElementById('s-precio').value)    || 23.50;
+  const dias      = parseFloat(document.getElementById('s-dias').value)      || 25;
+  const inversion = parseFloat(document.getElementById('s-inversion').value) || 1335000;
+
+  // ── Cálculos diarios ──────────────────────────────────────────────────────
+  // Combustible diario
+  const antCombDia = (antRutas * antKm / antRend) * precio;
+  const optCombDia = (optRutas * optKm / optRend) * precio;
+
+  // Costo mano de obra diario
+  const antMODia = antRutas * antHoras * antCostoHora;
+  const optMODia = optRutas * optHoras * optCostoHora;
+
+  // Totales diarios
+  const antTotalDia = antCombDia + antMODia;
+  const optTotalDia = optCombDia + optMODia;
+  const ahorroDia   = antTotalDia - optTotalDia;
+
+  // Km totales
+  const antKmTotal = antRutas * antKm;
+  const optKmTotal = optRutas * optKm;
+
+  // Entregas totales
+  const antEntregasDia = antRutas * antEntregas;
+  const optEntregasDia = optRutas * optEntregas;
+
+  // Proyecciones
+  const ahorroMes = ahorroDia * dias;
+  const ahorroAnio = ahorroMes * 12;
+  const ahorro5   = ahorroAnio * 5;
+
+  // Recuperación de inversión
+  const mesesRecup = inversion > 0 ? Math.ceil(inversion / ahorroMes) : 0;
+
+  // ── Render: KPIs comparativos ─────────────────────────────────────────────
+  const compareEl = document.getElementById('sim-compare');
+  const comparativas = [
+    { label: 'Km totales / día', antes: fmtNum(antKmTotal,0)+' km', despues: fmtNum(optKmTotal,0)+' km', delta: '-'+fmtNum((antKmTotal-optKmTotal)/antKmTotal*100,1)+'%', saving: true },
+    { label: 'Entregas / día', antes: fmtNum(antEntregasDia,0), despues: fmtNum(optEntregasDia,0), delta: '+'+fmtNum((optEntregasDia-antEntregasDia)/antEntregasDia*100,1)+'%', saving: true },
+    { label: 'Costo combustible / día', antes: fmtMXN(antCombDia), despues: fmtMXN(optCombDia), delta: '-'+fmtNum((antCombDia-optCombDia)/antCombDia*100,1)+'%', saving: true },
+    { label: 'Costo total / día', antes: fmtMXN(antTotalDia), despues: fmtMXN(optTotalDia), delta: '-'+fmtNum((antTotalDia-optTotalDia)/antTotalDia*100,1)+'%', saving: true },
+  ];
+
+  compareEl.innerHTML = comparativas.map(c => `
+    <div class="sim-compare-card ${c.saving ? 'saving' : 'danger'}">
+      <span class="sim-compare-label">${c.label}</span>
+      <div class="sim-compare-vals">
+        <span class="sim-val-before">${c.antes}</span>
+        <span class="sim-val-after">${c.despues}</span>
+      </div>
+      <span class="sim-val-delta">${c.delta}</span>
+    </div>`).join('');
+
+  // ── Render: KPIs financieros ──────────────────────────────────────────────
+  document.getElementById('sim-kpis').innerHTML = `
+    <div class="calc-kpi-box">
+      <span class="calc-kpi-val">${fmtMXN(ahorroDia)}</span>
+      <span class="calc-kpi-lbl">Ahorro diario</span>
+    </div>
+    <div class="calc-kpi-box">
+      <span class="calc-kpi-val">${fmtMXN(ahorroMes)}</span>
+      <span class="calc-kpi-lbl">Ahorro mensual (${dias} días)</span>
+    </div>
+    <div class="calc-kpi-box accent">
+      <span class="calc-kpi-val">${fmtMXN(ahorroAnio)}</span>
+      <span class="calc-kpi-lbl">Ahorro anual</span>
+    </div>
+    <div class="calc-kpi-box">
+      <span class="calc-kpi-val">${fmtMXN(ahorro5)}</span>
+      <span class="calc-kpi-lbl">Ahorro a 5 años</span>
+    </div>
+    <div class="calc-kpi-box">
+      <span class="calc-kpi-val">${mesesRecup} meses</span>
+      <span class="calc-kpi-lbl">Recuperación de inversión</span>
+    </div>
+    <div class="calc-kpi-box">
+      <span class="calc-kpi-val">${fmtPct(ahorro5/inversion*100)}</span>
+      <span class="calc-kpi-lbl">ROI a 5 años</span>
+    </div>`;
+
+  // ── Render: Tabla proyección mensual/anual ────────────────────────────────
+  const tbody = document.getElementById('sim-tbody');
+  tbody.innerHTML = '';
+  let acumulado = 0;
+
+  // Meses del año 1 (mensual detallado)
+  for (let m = 1; m <= 12; m++) {
+    acumulado += ahorroMes;
+    const pendiente = Math.max(0, inversion - acumulado);
+    const roi = ((acumulado - inversion) / inversion * 100);
+    const breakeven = acumulado >= inversion;
+    const estado = pendiente > 0
+      ? `<span class="roi-pill pending">⏳ En recuperación</span>`
+      : `<span class="roi-pill ${roi > 50 ? 'positive' : 'breakeven'}">✓ ${fmtPct(roi)} ROI</span>`;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>Mes ${m} (Año 1)</td>
+      <td class="num">${fmtMXN(ahorroMes)}</td>
+      <td class="num" style="color:var(--accent);font-weight:700">${fmtMXN(acumulado)}</td>
+      <td class="num" style="color:${pendiente > 0 ? 'var(--warn)' : 'var(--accent)'}">${pendiente > 0 ? fmtMXN(pendiente) : '✓ Recuperada'}</td>
+      <td class="num">${fmtPct(Math.max(0, roi))}</td>
+      <td>${estado}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  // Años 2–5 (anual)
+  for (let y = 2; y <= 5; y++) {
+    acumulado += ahorroAnio;
+    const pendiente = Math.max(0, inversion - acumulado);
+    const roi = ((acumulado - inversion) / inversion * 100);
+    const estado = `<span class="roi-pill positive">✓ ${fmtPct(roi)} ROI</span>`;
+    const tr = document.createElement('tr');
+    tr.style.background = 'rgba(0,229,160,0.04)';
+    tr.innerHTML = `
+      <td style="font-weight:700;color:var(--accent)">Año ${y}</td>
+      <td class="num">${fmtMXN(ahorroAnio)}</td>
+      <td class="num" style="color:var(--accent);font-weight:700">${fmtMXN(acumulado)}</td>
+      <td class="num" style="color:var(--accent)">✓ Recuperada</td>
+      <td class="num">${fmtPct(roi)}</td>
+      <td>${estado}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  // ── Render: Modelo de cobro por ahorro ────────────────────────────────────
+  const feeGrid = document.getElementById('sim-fee-grid');
+  feeGrid.innerHTML = [30, 35, 40].map(pct => {
+    const feeMes  = ahorroMes  * pct / 100;
+    const feeAnio = ahorroAnio * pct / 100;
+    const fee5    = ahorro5    * pct / 100;
+    const clienteAnio = ahorroAnio - feeAnio;
+    return `
+      <div class="sim-fee-card">
+        <div class="sim-fee-pct">${pct}%</div>
+        <div class="sim-fee-label">del ahorro generado</div>
+        <div class="sim-fee-row">
+          <span class="sim-fee-row-label">Cobro mensual</span>
+          <span class="sim-fee-row-val highlight">${fmtMXN(feeMes)}</span>
+        </div>
+        <div class="sim-fee-row">
+          <span class="sim-fee-row-label">Cobro anual</span>
+          <span class="sim-fee-row-val highlight">${fmtMXN(feeAnio)}</span>
+        </div>
+        <div class="sim-fee-row">
+          <span class="sim-fee-row-label">Cobro a 5 años</span>
+          <span class="sim-fee-row-val highlight">${fmtMXN(fee5)}</span>
+        </div>
+        <div class="sim-fee-row">
+          <span class="sim-fee-row-label">Ahorro neto cliente/año</span>
+          <span class="sim-fee-row-val">${fmtMXN(clienteAnio)}</span>
+        </div>
+        <div class="sim-fee-row">
+          <span class="sim-fee-row-label">Recuperación inversión</span>
+          <span class="sim-fee-row-val">${Math.ceil(inversion / feeAnio * 12)} meses</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('sim-results').style.display = 'block';
+}
+
+// ── Eventos del modal simulador ───────────────────────────────────────────────
+const simBackdrop = document.getElementById('sim-backdrop');
+const openSimBtn  = document.getElementById('open-sim');
+const closeSimBtn = document.getElementById('close-sim');
+const simRunBtn   = document.getElementById('sim-run');
+
+function openSim()  { simBackdrop.classList.add('open');    document.body.style.overflow = 'hidden'; }
+function closeSim() { simBackdrop.classList.remove('open'); document.body.style.overflow = ''; }
+
+openSimBtn.addEventListener('click',  openSim);
+closeSimBtn.addEventListener('click', closeSim);
+simRunBtn.addEventListener('click',   runSimulator);
+simBackdrop.addEventListener('click', e => { if (e.target === simBackdrop) closeSim(); });

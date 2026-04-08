@@ -1282,3 +1282,191 @@ input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
   height: 18px !important;
   box-shadow: 0 0 12px rgba(107,206,255,0.8);
 }
+
+/* ── SIMULATOR BUTTON ────────────────────── */
+.sim-btn {
+  background: rgba(155, 89, 182, 0.12);
+  border-color: rgba(155, 89, 182, 0.35);
+  color: #c77dff;
+}
+.sim-btn:hover {
+  background: rgba(155, 89, 182, 0.22);
+  border-color: #c77dff;
+}
+
+/* ── SIMULATOR MODAL ─────────────────────── */
+.sim-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sim-col {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sim-col-header {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid;
+  margin-bottom: 4px;
+}
+
+.sim-col-header.antes  { color: var(--danger);  border-color: var(--danger); }
+.sim-col-header.despues{ color: var(--accent);  border-color: var(--accent); }
+
+.sim-run-btn {
+  background: rgba(155, 89, 182, 0.12);
+  border-color: rgba(155, 89, 182, 0.35);
+  color: #c77dff;
+}
+.sim-run-btn:hover {
+  background: rgba(155, 89, 182, 0.22);
+  border-color: #c77dff;
+}
+
+/* Compare KPI grid */
+.sim-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sim-compare-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.sim-compare-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 3px;
+}
+.sim-compare-card.saving::before { background: var(--accent); }
+.sim-compare-card.danger::before { background: var(--danger); }
+
+.sim-compare-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  margin-bottom: 6px;
+  display: block;
+}
+
+.sim-compare-vals {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.sim-val-before {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--danger);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.sim-val-after {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.sim-val-delta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+/* Fee model grid */
+.sim-fee-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.sim-fee-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  text-align: center;
+  background: var(--bg-card);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.sim-fee-card:hover {
+  border-color: #c77dff;
+  background: rgba(155, 89, 182, 0.06);
+}
+
+.sim-fee-pct {
+  font-family: var(--font-mono);
+  font-size: 32px;
+  font-weight: 700;
+  color: #c77dff;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.sim-fee-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  margin-bottom: 12px;
+}
+
+.sim-fee-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.sim-fee-row:last-child { border-bottom: none; }
+.sim-fee-row-label { color: var(--text-secondary); }
+.sim-fee-row-val   { font-family: var(--font-mono); font-weight: 700; color: var(--text-primary); }
+.sim-fee-row-val.highlight { color: #c77dff; }
+
+/* ROI status pills in table */
+.roi-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.roi-pill.pending  { background: rgba(255,183,3,0.12);  color: var(--warn); }
+.roi-pill.breakeven{ background: rgba(0,229,160,0.12);  color: var(--accent); }
+.roi-pill.positive { background: rgba(0,229,160,0.2);   color: var(--accent); }

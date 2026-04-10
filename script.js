@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════ */
 
 const GEOJSON_PATH  = 'rutas_optimizadas.geojson';
-const POLYGONS_PATH = 'poligonos.geojson';
+const POLYGONS_PATH = 'polígonos.geojson';
 
 // ── PALETA ────────────────────────────────────────────────────────────────────
 const PALETTE = [
@@ -1044,7 +1044,7 @@ function runSimulator() {
 
   // ── Render: Modelo de cobro por ahorro ────────────────────────────────────
   const feeGrid = document.getElementById('sim-fee-grid');
-  feeGrid.innerHTML = [30, 35, 40].map(pct => {
+  feeGrid.innerHTML = [5, 10, 15].map(pct => {
     const feeMes  = ahorroMes  * pct / 100;
     const feeAnio = ahorroAnio * pct / 100;
     const fee5    = ahorro5    * pct / 100;
